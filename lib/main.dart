@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
 
 import 'screens/home_screen.dart';
 import 'services/notification_service.dart';
@@ -11,19 +11,22 @@ import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize timezone database (required before using tz.local)
+  tz.initializeTimeZones();
+  
   try {
-    NotificationService? notifications;
-    if (!kIsWeb) {
-      notifications = NotificationService.instance;
-      await notifications.initialize();
-    }
+    // Initialize NotificationService on all platforms
+    final notifications = NotificationService.instance;
+    await notifications.initialize();
+    
     final storage = await StorageService.initialize(notifications);
     await storage.reconcile();
 
     // Initialize and start the foreground reminder scheduler
     final reminderScheduler = ReminderSchedulerService(
       storage: storage,
-      notifications: notifications ?? NotificationService.instance,
+      notifications: notifications,
     )..start();
 
     runApp(TwinceApp(
