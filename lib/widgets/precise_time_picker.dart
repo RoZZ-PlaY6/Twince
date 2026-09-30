@@ -122,7 +122,7 @@ class _PreciseTimeDialogState extends State<_PreciseTimeDialog> {
         width: 90,
         child: DropdownButtonFormField<T>(
           key: ValueKey('select-$label'),
-          initialValue: value,
+          value: value,
           decoration: InputDecoration(
             labelText: label,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

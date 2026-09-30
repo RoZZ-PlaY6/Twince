@@ -110,7 +110,7 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
               children: [
                 // Dropdown with sound selection
                 DropdownButtonFormField<String>(
-                  initialValue: effectiveSoundId,
+                  value: effectiveSoundId,
                   decoration: InputDecoration(
                     hintText: widget.hintText,
                     filled: true,
