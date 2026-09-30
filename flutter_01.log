@@ -1,0 +1,72 @@
+Flutter crash report.
+Please report a bug at https://github.com/flutter/flutter/issues.
+
+## command
+
+flutter run -d web-server --web-port=13444
+
+## exception
+
+RPCError: ext.flutter.debugDumpFocusTree: (-32603) Unexpected DWDS error for callServiceExtension: TimeoutException after 0:00:10.000000: Service extension ext.flutter.debugDumpFocusTree timed out - received 1/2 responses
+
+```
+#0      new _OutstandingRequest (package:vm_service/src/vm_service.dart:278:34)
+#1      VmService._call.<anonymous closure> (package:vm_service/src/vm_service.dart:1960:25)
+#2      VmService._call (package:vm_service/src/vm_service.dart:1972:8)
+#3      VmService.callServiceExtension (package:vm_service/src/vm_service.dart:1911:14)
+#4      FlutterVmService._checkedCallServiceExtension (package:flutter_tools/src/vmservice.dart:784:28)
+#5      FlutterVmService.invokeFlutterExtensionRpcRaw (package:flutter_tools/src/vmservice.dart:802:49)
+#6      FlutterVmService.flutterDebugDumpFocusTree (package:flutter_tools/src/vmservice.dart:597:50)
+#7      ResidentHandlers.debugDumpFocusTree (package:flutter_tools/src/resident_runner.dart:670:53)
+<asynchronous suspension>
+#8      TerminalHandler.processTerminalInput (package:flutter_tools/src/resident_runner.dart:1937:7)
+<asynchronous suspension>
+```
+
+## flutter doctor
+
+```
+[32m[✓][39m Flutter (Channel stable, 3.47.5, on Microsoft Windows [Version 10.0.19045.6937], locale en-US) [512ms]
+    [32m•[39m Flutter version 3.47.5 on channel stable at C:\flutter
+    [32m•[39m Upstream repository https://github.com/flutter/flutter.git
+    [32m•[39m Framework revision 6a19cca564 (8 days ago), 2026-09-17 14:13:22 -0400
+    [32m•[39m Engine revision af7e796e16
+    [32m•[39m Dart version 3.13.4
+    [32m•[39m DevTools version 2.60.0
+    [32m•[39m Pub download mirror https://pub.flutter-io.cn
+    [32m•[39m Flutter download mirror https://storage.flutter-io.cn
+    [32m•[39m Feature flags: enable-web, enable-linux-desktop, enable-macos-desktop, enable-windows-desktop, enable-android,
+      enable-ios, cli-animations, enable-native-assets, enable-record-use, enable-swift-package-manager,
+      omit-legacy-version-file, enable-lldb-debugging, enable-uiscene-migration
+
+[32m[✓][39m Windows Version (10 Pro 64-bit, 22H2, 2009) [1,193ms]
+
+[31m[✗][39m Android toolchain - develop for Android devices [260ms]
+    [31m✗[39m Unable to locate Android SDK.
+      Install Android Studio from: https://developer.android.com/studio/index.html
+      On first launch it will assist you in installing the Android SDK components.
+      (or visit https://flutter.dev/to/windows-android-setup for detailed instructions).
+      If the Android SDK has been installed to a custom location, please use
+      `flutter config --android-sdk` to update to that location.
+
+
+[32m[✓][39m Chrome - develop for the web [253ms]
+    [32m•[39m Chrome at C:\Program Files\Google\Chrome\Application\chrome.exe
+
+[33m[!][39m Visual Studio - develop Windows apps (Visual Studio Build Tools 2026 18.3.2) [252ms]
+    [32m•[39m Visual Studio at C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools
+    [32m•[39m Visual Studio Build Tools 2026 version 18.3.11520.95
+    [31m✗[39m The current Visual Studio installation is incomplete.
+      Please use Visual Studio Installer to complete the installation or reinstall Visual Studio.
+
+[32m[✓][39m Connected device (4 available) [51ms]
+    [32m•[39m Windows (desktop) • windows    • windows-x64    • Microsoft Windows [Version 10.0.19045.6937]
+    [32m•[39m Web Server (web)  • web-server • web-javascript • Flutter Tools
+    [32m•[39m Chrome (web)      • chrome     • web-javascript • Google Chrome 153.0.8010.50
+    [32m•[39m Edge (web)        • edge       • web-javascript • Microsoft Edge 153.0.4234.48
+
+[32m[✓][39m Network resources [995ms]
+    [32m•[39m All expected network resources are available.
+
+[33m![39m Doctor found issues in 2 categories.
+```
