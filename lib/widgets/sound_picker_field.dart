@@ -239,12 +239,12 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: AppTheme.surface.withValues(alpha: 0.5),
+                color: AppTheme.surface.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: isCurrentPlaying
-                      ? AppTheme.cyan.withValues(alpha: 0.5)
-                      : AppTheme.purple.withValues(alpha: 0.3),
+                      ? AppTheme.cyan.withOpacity(0.5)
+                      : AppTheme.purple.withOpacity(0.3),
                 ),
               ),
               child: Row(
@@ -370,12 +370,12 @@ class _GlowingPlayButtonState extends State<_GlowingPlayButton>
             boxShadow: [
               if (widget.isPlaying)
                 BoxShadow(
-                  color: widget.color.withValues(alpha: 0.4 * _pulseAnimation.value),
+                  color: widget.color.withOpacity(0.4 * _pulseAnimation.value),
                   blurRadius: 20 * _pulseAnimation.value,
                   spreadRadius: 2 * _pulseAnimation.value,
                 ),
               BoxShadow(
-                color: widget.color.withValues(alpha: 0.2),
+                color: widget.color.withOpacity(0.2),
                 blurRadius: 8,
                 spreadRadius: 1,
               ),
@@ -393,14 +393,14 @@ class _GlowingPlayButtonState extends State<_GlowingPlayButton>
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
                     colors: [
-                      widget.color.withValues(alpha: 0.9),
+                      widget.color.withOpacity(0.9),
                       widget.color,
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   border: Border.all(
-                    color: widget.color.withValues(alpha: 0.5),
+                    color: widget.color.withOpacity(0.5),
                     width: 1.5,
                   ),
                 ),

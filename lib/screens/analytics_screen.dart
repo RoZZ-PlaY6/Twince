@@ -203,7 +203,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               decoration: BoxDecoration(
                 color: AppTheme.surface,
-                border: Border(bottom: BorderSide(color: AppTheme.purple.withValues(alpha: 0.3))),
+                border: Border(bottom: BorderSide(color: AppTheme.purple.withOpacity(0.3))),
               ),
               child: Column(
                 children: [
@@ -308,10 +308,10 @@ class _ViewModeButton extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
-              color: selected ? AppTheme.cyan.withValues(alpha: 0.2) : AppTheme.surface,
+              color: selected ? AppTheme.cyan.withOpacity(0.2) : AppTheme.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: selected ? AppTheme.cyan : AppTheme.purple.withValues(alpha: 0.5),
+                color: selected ? AppTheme.cyan : AppTheme.purple.withOpacity(0.5),
               ),
             ),
             child: Text(
@@ -403,7 +403,7 @@ class _MetricCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppTheme.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.4)),
+            border: Border.all(color: color.withOpacity(0.4)),
           ),
           child: Column(
             children: [
@@ -543,9 +543,9 @@ class _DayTaskTile extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.surface.withValues(alpha: 0.5),
+        color: AppTheme.surface.withOpacity(0.5),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Row(
         children: [
@@ -623,9 +623,9 @@ class _TagChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
+          color: color.withOpacity(0.15),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withValues(alpha: 0.4)),
+          border: Border.all(color: color.withOpacity(0.4)),
         ),
         child: Text(
           label,

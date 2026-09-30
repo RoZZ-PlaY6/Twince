@@ -104,9 +104,9 @@ class AppTheme {
   static BoxDecoration neonCard({Color accent = purple}) => BoxDecoration(
         color: surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: accent.withValues(alpha: .7)),
+        border: Border.all(color: accent.withOpacity(0.7)),
         boxShadow: [
-          BoxShadow(color: accent.withValues(alpha: .14), blurRadius: 16)
+          BoxShadow(color: accent.withOpacity(0.14), blurRadius: 16)
         ],
       );
 }

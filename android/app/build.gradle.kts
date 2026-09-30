@@ -7,7 +7,7 @@ plugins {
 android {
     namespace = "com.twince.app"
     compileSdk = 35
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "26.1.10909125"
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true

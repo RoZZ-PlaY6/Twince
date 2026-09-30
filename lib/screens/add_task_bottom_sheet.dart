@@ -159,18 +159,18 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
                   : null,
               tooltip: option.description,
               showCheckmark: true,
-              selectedColor: AppTheme.cyan.withValues(alpha: 0.3),
+              selectedColor: AppTheme.cyan.withOpacity(0.3),
               checkmarkColor: AppTheme.cyan,
               backgroundColor: isAvailable
                   ? AppTheme.surface
-                  : AppTheme.surface.withValues(alpha: 0.5),
+                  : AppTheme.surface.withOpacity(0.5),
               labelStyle: TextStyle(
                 color: isAvailable ? Colors.white : Colors.white38,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
               ),
               side: BorderSide(
                 color: isAvailable
-                    ? (isSelected ? AppTheme.cyan : AppTheme.purple.withValues(alpha: 0.5))
+                    ? (isSelected ? AppTheme.cyan : AppTheme.purple.withOpacity(0.5))
                     : Colors.white24,
               ),
             );

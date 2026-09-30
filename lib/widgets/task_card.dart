@@ -179,7 +179,7 @@ class _TaskCardState extends State<TaskCard> {
                         borderRadius: BorderRadius.circular(8),
                         boxShadow: [
                           BoxShadow(
-                            color: AppTheme.cyan.withValues(alpha: .35),
+                            color: AppTheme.cyan.withOpacity(0.35),
                             blurRadius: 12,
                           )
                         ],
@@ -228,8 +228,8 @@ class _TaskCardState extends State<TaskCard> {
   Widget _badge(String text, Color color) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: .12),
-          border: Border.all(color: color.withValues(alpha: .6)),
+          color: color.withOpacity(0.12),
+          border: Border.all(color: color.withOpacity(0.6)),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(text, style: TextStyle(color: color, fontSize: 11)),
