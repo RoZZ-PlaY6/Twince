@@ -42,7 +42,7 @@ class AppTheme {
         ),
         toolbarTextStyle: baseTextTheme.bodyMedium,
       ),
-      tabBarTheme: TabBarThemeData(
+      tabBarTheme: TabBarTheme(
         labelStyle: baseTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
         unselectedLabelStyle: baseTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w400),
       ),
@@ -94,7 +94,7 @@ class AppTheme {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-      dialogTheme: DialogThemeData(
+      dialogTheme: DialogTheme(
         titleTextStyle: baseTextTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         contentTextStyle: baseTextTheme.bodyMedium,
       ),
@@ -110,4 +110,3 @@ class AppTheme {
         ],
       );
 }
-   // trigger build
