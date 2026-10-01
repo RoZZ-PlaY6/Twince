@@ -9,6 +9,7 @@ import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/task_card.dart';
 import '../widgets/test_notification_dialog.dart';
+import '../widgets/export_backup_button.dart';
 import 'add_task_bottom_sheet.dart';
 import 'analytics_screen.dart';
 import 'history_screen.dart';
@@ -38,6 +39,7 @@ class HomeScreen extends StatelessWidget {
                       builder: (_) => const AnalyticsScreen()),
                 ),
               ),
+              const ExportBackupButton(),
               IconButton(
                 tooltip: 'History',
                 icon: const Icon(Icons.history, color: AppTheme.cyan),
