@@ -25,9 +25,10 @@ class MainActivity : FlutterActivity() {
                 }
                 try {
                     val file = File(path)
+                    val authority = "${applicationContext.packageName}.fileprovider"
                     val uri = FileProvider.getUriForFile(
                         this,
-                        "${BuildConfig.APPLICATION_ID}.fileprovider",
+                        authority,
                         file,
                     )
                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
