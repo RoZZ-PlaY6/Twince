@@ -112,26 +112,113 @@ class HomeScreen extends StatelessWidget {
         ),
       );
     }
+
+    // Keep Hive occurrences independent; group only their presentation here.
+    final occurrencesByDefinition = <String, List<Task>>{};
+    for (final task in filtered) {
+      final definitionId = task.recurringDefinitionId;
+      if (definitionId != null) {
+        occurrencesByDefinition.putIfAbsent(definitionId, () => []).add(task);
+      }
+    }
+    final entries = <Object>[];
+    final addedGroups = <String>{};
+    for (final task in filtered) {
+      final definitionId = task.recurringDefinitionId;
+      final occurrences = occurrencesByDefinition[definitionId];
+      final hasMultipleDays = definitionId != null &&
+          (storage.getRecurringTaskById(definitionId)?.weekdays.length ?? 0) >
+              1;
+      if (definitionId != null &&
+          occurrences != null &&
+          (hasMultipleDays || occurrences.length > 1)) {
+        if (addedGroups.add(definitionId)) {
+          entries.add(_RecurringOccurrences(definitionId, occurrences));
+        }
+      } else {
+        entries.add(task);
+      }
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 90),
-      itemCount: filtered.length,
+      itemCount: entries.length,
       itemBuilder: (context, index) {
-        final task = filtered[index];
-        return TaskCard(
-          key: ValueKey(task.id),
-          task: task,
-          onToggle: () =>
-              _perform(context, storage.toggleTaskCompleted(task.id)),
-          onDelete: () => _perform(context, storage.deleteTask(task.id)),
-          onExpire: () => _perform(context, storage.markTaskFailed(task.id)),
-          onEdit: () => showModalBottomSheet<void>(
-            context: context,
-            isScrollControlled: true,
-            showDragHandle: true,
-            builder: (_) => AddTaskBottomSheet(storage: storage, task: task),
+        final entry = entries[index];
+        if (entry is Task) return _taskCard(context, storage, entry);
+        final group = entry as _RecurringOccurrences;
+        final definition = storage.getRecurringTaskById(group.definitionId);
+        const weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        final weekdays = definition?.weekdays
+                .map((day) => weekdayNames[day - 1])
+                .join(' · ') ??
+            '';
+        final count = group.occurrences.length;
+        final statusLabel = switch (status) {
+          TaskStatus.pending => 'active',
+          TaskStatus.completed => 'completed',
+          TaskStatus.failed => 'failed',
+        };
+        final accent = switch (status) {
+          TaskStatus.pending => AppTheme.cyan,
+          TaskStatus.completed => AppTheme.completed,
+          TaskStatus.failed => AppTheme.failed,
+        };
+        return Container(
+          key: ValueKey('recurring-${status.name}-${group.definitionId}'),
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: AppTheme.neonCard(accent: accent),
+          clipBehavior: Clip.antiAlias,
+          child: ExpansionTile(
+            key: PageStorageKey(
+                'recurring-${status.name}-${group.definitionId}'),
+            leading: Icon(Icons.repeat, color: accent),
+            iconColor: accent,
+            collapsedIconColor: accent,
+            shape: const Border(),
+            collapsedShape: const Border(),
+            title: Text(definition?.title ?? group.occurrences.first.title),
+            subtitle: Text(
+              [if (weekdays.isNotEmpty) weekdays, '$count $statusLabel']
+                  .join('  ·  '),
+              style: const TextStyle(color: Colors.white70),
+            ),
+            childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+            children: [
+              for (final occurrence in group.occurrences) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 6),
+                    child: Text(
+                      MaterialLocalizations.of(context)
+                          .formatMediumDate(occurrence.targetDate),
+                      style: TextStyle(color: accent),
+                    ),
+                  ),
+                ),
+                _taskCard(context, storage, occurrence),
+              ],
+            ],
           ),
         );
       },
+    );
+  }
+
+  Widget _taskCard(BuildContext context, StorageService storage, Task task) {
+    return TaskCard(
+      key: ValueKey(task.id),
+      task: task,
+      onToggle: () => _perform(context, storage.toggleTaskCompleted(task.id)),
+      onDelete: () => _perform(context, storage.deleteTask(task.id)),
+      onExpire: () => _perform(context, storage.markTaskFailed(task.id)),
+      onEdit: () => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => AddTaskBottomSheet(storage: storage, task: task),
+      ),
     );
   }
 
@@ -151,4 +238,11 @@ class HomeScreen extends StatelessWidget {
       }
     }
   }
+}
+
+class _RecurringOccurrences {
+  const _RecurringOccurrences(this.definitionId, this.occurrences);
+
+  final String definitionId;
+  final List<Task> occurrences;
 }
