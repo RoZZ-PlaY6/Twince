@@ -276,4 +276,11 @@ class StorageService extends ChangeNotifier {
     _recurringBox.close();
     _notifications?.dispose();
   }
+
+  /// Clears all tasks and recurring tasks from storage
+  Future<void> clearAllData() async {
+    await _box.clear();
+    await _recurringBox.clear();
+    notifyListeners();
+  }
 }
