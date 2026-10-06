@@ -33,12 +33,13 @@ class AlarmService {
     if (!_isAndroid || !task.isAlarm || task.status != TaskStatus.pending) {
       return;
     }
-    if (!task.startTime.isAfter(DateTime.now())) return;
+    final triggerTime = task.endTime.toLocal();
+    if (!triggerTime.isAfter(DateTime.now().toLocal())) return;
     await _channel.invokeMethod<void>('schedule', {
       'taskId': task.id,
       'title': task.title,
       'description': task.description,
-      'triggerAtMillis': task.startTime.millisecondsSinceEpoch,
+      'triggerAtMillis': triggerTime.millisecondsSinceEpoch,
       'soundType': task.alarmSoundType.name,
       'soundId': task.alarmSoundId,
       'soundUri': task.alarmSoundUri,

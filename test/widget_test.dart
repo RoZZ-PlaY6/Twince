@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:twince/models/task.dart';
 import 'package:twince/widgets/task_card.dart';
@@ -7,8 +9,23 @@ import 'package:twince/widgets/test_notification_dialog.dart';
 import 'package:twince/widgets/alarm_sound_picker.dart';
 import 'package:twince/screens/home_screen.dart';
 import 'package:twince/screens/add_task_bottom_sheet.dart';
+import 'package:twince/services/alarm_service.dart';
 
 void main() {
+  test('start time one minute ahead stays on today', () {
+    final now = DateTime(2026, 10, 7, 1, 42);
+    final result = resolveTaskSchedule(
+      selectedDate: now,
+      selectedStartTime: DateTime(2000, 1, 1, 1, 43),
+      selectedEndTime: DateTime(2000, 1, 1, 2, 42),
+      now: now,
+      adjustPassedAlarm: true,
+    );
+
+    expect(result.targetDate, DateTime(2026, 10, 7));
+    expect(result.startTime, DateTime(2026, 10, 7, 1, 43));
+  });
+
   test('alarm schedule uses the task date and local timezone', () {
     final now = DateTime(2026, 10, 7, 10);
     final result = resolveTaskSchedule(
@@ -39,7 +56,7 @@ void main() {
     expect(result.startTime, DateTime(2026, 10, 8, 9));
   });
 
-  test('alarm time in the current minute gets a tolerance lead', () {
+  test('active timed-task window remains on today', () {
     final now = DateTime(2026, 10, 7, 12, 30, 40);
     final result = resolveTaskSchedule(
       selectedDate: now,
@@ -50,8 +67,40 @@ void main() {
     );
 
     expect(result.targetDate, DateTime(2026, 10, 7));
-    expect(result.startTime, now.add(const Duration(seconds: 2)));
-    expect(result.startTime.isAfter(now), isTrue);
+    expect(result.startTime, DateTime(2026, 10, 7, 12, 30, 15));
+    expect(result.endTime, DateTime(2026, 10, 7, 13));
+  });
+
+  test('Android exact alarm uses the task end time', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    const channel = MethodChannel('twince/alarms');
+    MethodCall? captured;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      captured = call;
+      return true;
+    });
+    addTearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    final now = DateTime.now();
+    final task = Task(
+      title: 'Timed task',
+      targetDate: DateTime(now.year, now.month, now.day),
+      startTime: now.add(const Duration(minutes: 1)),
+      endTime: now.add(const Duration(hours: 1)),
+      isAlarm: true,
+    );
+    await AlarmService.instance.schedule(task);
+
+    expect(captured?.method, 'schedule');
+    expect(
+      (captured?.arguments as Map<Object?, Object?>)['triggerAtMillis'],
+      task.endTime.millisecondsSinceEpoch,
+    );
   });
 
   test('alarmed task filter keeps only pending future alarms', () {
