@@ -11,8 +11,9 @@ import 'browser_notification.dart';
 class _ScheduledNotification {
   final DateTime time;
   final String type; // '5x', 'everyHour', 'thirtyMinutes', etc.
-  final int? minuteOffset; // Negative minutes from end (e.g., -5 for 5 minutes before end)
-  
+  final int?
+      minuteOffset; // Negative minutes from end (e.g., -5 for 5 minutes before end)
+
   _ScheduledNotification({
     required this.time,
     required this.type,
@@ -63,7 +64,8 @@ class NotificationService {
       await android?.requestNotificationsPermission();
       _exactAlarmsAllowed =
           await android?.requestExactAlarmsPermission() ?? false;
-      debugPrint('NotificationService: Android initialized, exact alarms: $_exactAlarmsAllowed');
+      debugPrint(
+          'NotificationService: Android initialized, exact alarms: $_exactAlarmsAllowed');
     } else {
       debugPrint('NotificationService: Web platform detected');
     }
@@ -78,7 +80,8 @@ class NotificationService {
       for (final request in pending) {
         if (request.payload == taskId) {
           await _plugin.cancel(request.id);
-          debugPrint('NotificationService: Cancelled notification $request.id for task $taskId');
+          debugPrint(
+              'NotificationService: Cancelled notification $request.id for task $taskId');
         }
       }
     } else {
@@ -111,17 +114,20 @@ class NotificationService {
   /// Schedules notifications for the active task window based on task's notificationTimerOptions.
   /// Supports: everyHour, 30m, 15m, 10m, 5m, 5x (last 5 minutes every minute)
   Future<void> scheduleTask(Task task) async {
-    debugPrint('NotificationService: scheduleTask called for "${task.title}" (${task.id})');
+    debugPrint(
+        'NotificationService: scheduleTask called for "${task.title}" (${task.id})');
     debugPrint('  startTime: ${task.startTime}, endTime: ${task.endTime}');
     debugPrint('  isTimeBound: ${task.isTimeBound}, status: ${task.status}');
-    debugPrint('  notificationTimerOptions: ${task.notificationTimerOptions.map((e) => e.name).toList()}');
+    debugPrint(
+        '  notificationTimerOptions: ${task.notificationTimerOptions.map((e) => e.name).toList()}');
 
     await cancelTask(task.id);
 
     if (!task.isTimeBound ||
         task.status != TaskStatus.pending ||
         task.notificationTimerOptions.isEmpty) {
-      debugPrint('NotificationService: Skipping - not timeBound, not pending, or no timer options');
+      debugPrint(
+          'NotificationService: Skipping - not timeBound, not pending, or no timer options');
       return;
     }
 
@@ -133,9 +139,10 @@ class NotificationService {
 
     // Calculate all notification times based on the selected options
     final notificationTimes = _calculateNotificationTimes(task, now);
-    
+
     if (notificationTimes.isEmpty) {
-      debugPrint('NotificationService: No valid notification times to schedule');
+      debugPrint(
+          'NotificationService: No valid notification times to schedule');
       return;
     }
 
@@ -147,7 +154,8 @@ class NotificationService {
   }
 
   /// Calculate all unique notification times based on the selected timer options
-  List<_ScheduledNotification> _calculateNotificationTimes(Task task, DateTime now) {
+  List<_ScheduledNotification> _calculateNotificationTimes(
+      Task task, DateTime now) {
     final times = <_ScheduledNotification>[];
     final duration = task.endTime.difference(task.startTime);
     final options = task.notificationTimerOptions;
@@ -191,7 +199,7 @@ class NotificationService {
         0,
         0,
       );
-      
+
       // If start time is not on the hour, move to next hour
       if (task.startTime.minute > 0 || task.startTime.second > 0) {
         hourTime = hourTime.add(const Duration(hours: 1));
@@ -205,11 +213,11 @@ class NotificationService {
 
     // Sort by time and remove duplicates (same time from different options)
     times.sort((a, b) => a.time.compareTo(b.time));
-    
+
     // Remove duplicates (same time within 1 second)
     final uniqueTimes = <_ScheduledNotification>[];
     for (final t in times) {
-      if (uniqueTimes.isEmpty || 
+      if (uniqueTimes.isEmpty ||
           t.time.difference(uniqueTimes.last.time).inSeconds > 1) {
         uniqueTimes.add(t);
       }
@@ -219,9 +227,11 @@ class NotificationService {
   }
 
   /// Android/Windows: Schedule using flutter_local_notifications with exact alarms
-  Future<void> _scheduleNotificationsAndroid(Task task, List<_ScheduledNotification> times) async {
+  Future<void> _scheduleNotificationsAndroid(
+      Task task, List<_ScheduledNotification> times) async {
     if (!_exactAlarmsAllowed) {
-      debugPrint('NotificationService: Exact alarms not allowed, skipping Android scheduling');
+      debugPrint(
+          'NotificationService: Exact alarms not allowed, skipping Android scheduling');
       return;
     }
 
@@ -231,15 +241,19 @@ class NotificationService {
       try {
         final tzWhen = tz.TZDateTime.from(notification.time, _localLocation!);
         final id = _notificationId(task.id, i);
-        
+
         String body;
         if (notification.type == '5x' && notification.minuteOffset != null) {
-          body = '${(-notification.minuteOffset!)} minutes remaining until the task ends.';
+          body =
+              '${(-notification.minuteOffset!)} minutes remaining until the task ends.';
         } else if (notification.minuteOffset != null) {
-          body = '${(-notification.minuteOffset!)} minutes remaining until the task ends.';
+          body =
+              '${(-notification.minuteOffset!)} minutes remaining until the task ends.';
         } else if (notification.type == 'everyHour') {
-          final hoursRemaining = task.endTime.difference(notification.time).inHours;
-          body = '$hoursRemaining hour${hoursRemaining != 1 ? 's' : ''} remaining until the task ends.';
+          final hoursRemaining =
+              task.endTime.difference(notification.time).inHours;
+          body =
+              '$hoursRemaining hour${hoursRemaining != 1 ? 's' : ''} remaining until the task ends.';
         } else {
           body = _getNotificationBody(task);
         }
@@ -254,18 +268,21 @@ class NotificationService {
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         );
         scheduledCount++;
-        debugPrint('NotificationService: Scheduled ${notification.type} notification for "${task.title}" at ${notification.time}');
+        debugPrint(
+            'NotificationService: Scheduled ${notification.type} notification for "${task.title}" at ${notification.time}');
       } catch (e) {
         debugPrint('NotificationService: Failed to schedule notification: $e');
       }
     }
-    debugPrint('NotificationService: Scheduled $scheduledCount notifications for "${task.title}"');
+    debugPrint(
+        'NotificationService: Scheduled $scheduledCount notifications for "${task.title}"');
   }
 
   /// Web: Use Timer-based scheduling for foreground notifications
-  Future<void> _scheduleNotificationsWeb(Task task, List<_ScheduledNotification> times) async {
+  Future<void> _scheduleNotificationsWeb(
+      Task task, List<_ScheduledNotification> times) async {
     final now = DateTime.now();
-    
+
     // Cancel any existing timer for this task
     _webTaskTimers[task.id]?.cancel();
 
@@ -273,34 +290,41 @@ class NotificationService {
     for (int i = 0; i < times.length; i++) {
       final notification = times[i];
       final delay = notification.time.difference(now);
-      
+
       if (delay.isNegative) continue;
-      
+
       final timer = Timer(delay, () async {
         String body;
         if (notification.type == '5x' && notification.minuteOffset != null) {
-          body = '${(-notification.minuteOffset!)} minutes remaining until the task ends.';
+          body =
+              '${(-notification.minuteOffset!)} minutes remaining until the task ends.';
         } else if (notification.minuteOffset != null) {
-          body = '${(-notification.minuteOffset!)} minutes remaining until the task ends.';
+          body =
+              '${(-notification.minuteOffset!)} minutes remaining until the task ends.';
         } else if (notification.type == 'everyHour') {
-          final hoursRemaining = task.endTime.difference(notification.time).inHours;
-          body = '$hoursRemaining hour${hoursRemaining != 1 ? 's' : ''} remaining until the task ends.';
+          final hoursRemaining =
+              task.endTime.difference(notification.time).inHours;
+          body =
+              '$hoursRemaining hour${hoursRemaining != 1 ? 's' : ''} remaining until the task ends.';
         } else {
           body = _getNotificationBody(task);
         }
-        
+
         await showBrowserNotification(
           'Task Reminder: ${task.title}',
           body,
         );
-        
-        debugPrint('NotificationService: Web - Fired ${notification.type} notification for "${task.title}"');
+
+        debugPrint(
+            'NotificationService: Web - Fired ${notification.type} notification for "${task.title}"');
       });
-      
-      _webTaskTimers['${task.id}:${notification.time.millisecondsSinceEpoch}'] = timer;
+
+      _webTaskTimers['${task.id}:${notification.time.millisecondsSinceEpoch}'] =
+          timer;
     }
-    
-    debugPrint('NotificationService: Web - Scheduled ${times.length} timers for "${task.title}"');
+
+    debugPrint(
+        'NotificationService: Web - Scheduled ${times.length} timers for "${task.title}"');
   }
 
   void _scheduleWebTimer(Task task, DateTime now) {
@@ -310,39 +334,45 @@ class NotificationService {
     // Calculate next interval
     var nextInterval = task.startTime;
     while (nextInterval.isBefore(now)) {
-      nextInterval = nextInterval.add(Duration(minutes: task.reminderIntervalMinutes));
+      nextInterval =
+          nextInterval.add(Duration(minutes: task.reminderIntervalMinutes));
     }
 
     if (nextInterval.isBefore(task.endTime)) {
       final delay = nextInterval.difference(now);
-      debugPrint('NotificationService: Web - next reminder for "${task.title}" in ${delay.inSeconds}s at $nextInterval');
-      
+      debugPrint(
+          'NotificationService: Web - next reminder for "${task.title}" in ${delay.inSeconds}s at $nextInterval');
+
       _webTaskTimers[task.id] = Timer(delay, () async {
         // Show notification
         await showBrowserNotification(
           'Task In Progress: ${task.title}',
           _getNotificationBody(task),
         );
-        
+
         // Schedule next interval if still within endTime
         final nextNow = DateTime.now();
-        if (!nextNow.isBefore(task.startTime) && nextNow.isBefore(task.endTime)) {
+        if (!nextNow.isBefore(task.startTime) &&
+            nextNow.isBefore(task.endTime)) {
           _scheduleWebTimer(task, nextNow);
         } else {
-          debugPrint('NotificationService: Web - task window ended, stopping timers for "${task.title}"');
+          debugPrint(
+              'NotificationService: Web - task window ended, stopping timers for "${task.title}"');
           _webTaskTimers.remove(task.id);
         }
       });
     } else {
-      debugPrint('NotificationService: Web - no more intervals within window for "${task.title}"');
+      debugPrint(
+          'NotificationService: Web - no more intervals within window for "${task.title}"');
     }
   }
 
   /// Schedules immediate notifications if the task window is currently active.
   /// This handles the case where the app starts and a task is already in progress.
   Future<void> scheduleImmediateIfActive(Task task) async {
-    debugPrint('NotificationService: scheduleImmediateIfActive for "${task.title}"');
-    
+    debugPrint(
+        'NotificationService: scheduleImmediateIfActive for "${task.title}"');
+
     if (!task.isTimeBound ||
         task.status != TaskStatus.pending ||
         task.notificationTimerOptions.isEmpty) {
@@ -357,9 +387,10 @@ class NotificationService {
 
     // Calculate the next notification time based on the selected options
     final notificationTimes = _calculateNotificationTimes(task, now);
-    
+
     // Find the next notification time after now
-    final futureNotifications = notificationTimes.where((n) => n.time.isAfter(now)).toList();
+    final futureNotifications =
+        notificationTimes.where((n) => n.time.isAfter(now)).toList();
     if (futureNotifications.isEmpty) {
       debugPrint('NotificationService: No future notifications to schedule');
       return;
@@ -373,16 +404,22 @@ class NotificationService {
       if (!_exactAlarmsAllowed) return;
       final id = _notificationId(task.id, 0);
       try {
-        final tzWhen = tz.TZDateTime.from(nextNotification.time, _localLocation!);
-        
+        final tzWhen =
+            tz.TZDateTime.from(nextNotification.time, _localLocation!);
+
         String body;
-        if (nextNotification.type == '5x' && nextNotification.minuteOffset != null) {
-          body = '${(-nextNotification.minuteOffset!)} minutes remaining until the task ends.';
+        if (nextNotification.type == '5x' &&
+            nextNotification.minuteOffset != null) {
+          body =
+              '${(-nextNotification.minuteOffset!)} minutes remaining until the task ends.';
         } else if (nextNotification.minuteOffset != null) {
-          body = '${(-nextNotification.minuteOffset!)} minutes remaining until the task ends.';
+          body =
+              '${(-nextNotification.minuteOffset!)} minutes remaining until the task ends.';
         } else if (nextNotification.type == 'everyHour') {
-          final hoursRemaining = task.endTime.difference(nextNotification.time).inHours;
-          body = '$hoursRemaining hour${hoursRemaining != 1 ? 's' : ''} remaining until the task ends.';
+          final hoursRemaining =
+              task.endTime.difference(nextNotification.time).inHours;
+          body =
+              '$hoursRemaining hour${hoursRemaining != 1 ? 's' : ''} remaining until the task ends.';
         } else {
           body = _getNotificationBody(task);
         }
@@ -396,33 +433,41 @@ class NotificationService {
           payload: task.id,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         );
-        debugPrint('NotificationService: Scheduled immediate active reminder for "${task.title}" at ${nextNotification.time}');
+        debugPrint(
+            'NotificationService: Scheduled immediate active reminder for "${task.title}" at ${nextNotification.time}');
       } catch (e) {
-        debugPrint('NotificationService: Failed to schedule immediate reminder: $e');
+        debugPrint(
+            'NotificationService: Failed to schedule immediate reminder: $e');
       }
     } else {
       // For web, schedule a timer for the next notification
       final delay = nextNotification.time.difference(DateTime.now());
       if (delay.isNegative) return;
-      
+
       _webTaskTimers['${task.id}:immediate'] = Timer(delay, () async {
         String body;
-        if (nextNotification.type == '5x' && nextNotification.minuteOffset != null) {
-          body = '${(-nextNotification.minuteOffset!)} minutes remaining until the task ends.';
+        if (nextNotification.type == '5x' &&
+            nextNotification.minuteOffset != null) {
+          body =
+              '${(-nextNotification.minuteOffset!)} minutes remaining until the task ends.';
         } else if (nextNotification.minuteOffset != null) {
-          body = '${(-nextNotification.minuteOffset!)} minutes remaining until the task ends.';
+          body =
+              '${(-nextNotification.minuteOffset!)} minutes remaining until the task ends.';
         } else if (nextNotification.type == 'everyHour') {
-          final hoursRemaining = task.endTime.difference(nextNotification.time).inHours;
-          body = '$hoursRemaining hour${hoursRemaining != 1 ? 's' : ''} remaining until the task ends.';
+          final hoursRemaining =
+              task.endTime.difference(nextNotification.time).inHours;
+          body =
+              '$hoursRemaining hour${hoursRemaining != 1 ? 's' : ''} remaining until the task ends.';
         } else {
           body = _getNotificationBody(task);
         }
-        
+
         await showBrowserNotification(
           'Task Reminder: ${task.title}',
           body,
         );
-        debugPrint('NotificationService: Web - Fired immediate notification for "${task.title}"');
+        debugPrint(
+            'NotificationService: Web - Fired immediate notification for "${task.title}"');
       });
     }
   }

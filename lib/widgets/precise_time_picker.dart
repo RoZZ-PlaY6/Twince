@@ -138,7 +138,9 @@ class _PreciseTimeDialogState extends State<_PreciseTimeDialog> {
                 (opt) => DropdownMenuItem(
                   value: opt,
                   child: Text(
-                    opt is int ? opt.toString().padLeft(2, '0') : opt.toString(),
+                    opt is int
+                        ? opt.toString().padLeft(2, '0')
+                        : opt.toString(),
                     textAlign: TextAlign.center,
                   ),
                 ),

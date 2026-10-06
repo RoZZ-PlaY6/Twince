@@ -33,19 +33,19 @@ class SoundPreviewService {
     NotificationSound(
       id: 'subtle_beep',
       name: 'Subtle Beep',
-      assetPath: 'assets/sounds/subtle_beep.mp3',
+      assetPath: 'assets/sounds/subtle_beep.wav',
       description: 'Minimal, clean notification',
     ),
     NotificationSound(
       id: 'cyber_pulse',
       name: 'Cyber Pulse',
-      assetPath: 'assets/sounds/cyber_pulse.mp3',
+      assetPath: 'assets/sounds/cyber_pulse.wav',
       description: 'Short, punchy cyberpunk notification',
     ),
     NotificationSound(
       id: 'gentle_bell',
       name: 'Gentle Bell',
-      assetPath: 'assets/sounds/gentle_bell.mp3',
+      assetPath: 'assets/sounds/gentle_bell.wav',
       description: 'Soft, pleasant bell tone',
     ),
   ];
@@ -103,12 +103,14 @@ class SoundPreviewService {
     final seenIds = <String>{};
     final deduplicated = loadedSounds.where((s) => seenIds.add(s.id)).toList();
     if (deduplicated.length != loadedSounds.length) {
-      debugPrint('SoundPreviewService: Removed ${loadedSounds.length - deduplicated.length} duplicate sound(s)');
+      debugPrint(
+          'SoundPreviewService: Removed ${loadedSounds.length - deduplicated.length} duplicate sound(s)');
     }
 
     _cachedAssetSounds = deduplicated;
     _soundsLoaded = true;
-    debugPrint('SoundPreviewService: Loaded ${deduplicated.length} sounds from asset manifest');
+    debugPrint(
+        'SoundPreviewService: Loaded ${deduplicated.length} sounds from asset manifest');
     _notifySoundsChanged();
     return deduplicated;
   }
@@ -135,16 +137,17 @@ class SoundPreviewService {
   /// Returns a valid sound ID (first available) or null if no sounds available.
   Future<String?> validateSoundId(String? soundId) async {
     if (soundId == null || soundId.isEmpty) return null;
-    
+
     final sounds = await _loadAssetSounds();
     if (sounds.isEmpty) return null;
-    
+
     // Check if the sound ID exists
     final exists = sounds.any((s) => s.id == soundId);
     if (exists) return soundId;
-    
+
     // Fallback to first available sound
-    debugPrint('SoundPreviewService: Sound ID "$soundId" not found, falling back to "${sounds.first.id}"');
+    debugPrint(
+        'SoundPreviewService: Sound ID "$soundId" not found, falling back to "${sounds.first.id}"');
     return sounds.first.id;
   }
 
@@ -161,7 +164,8 @@ class SoundPreviewService {
       final manifestFuture = AssetManifest.loadFromAssetBundle(rootBundle);
       final manifest = await manifestFuture.timeout(const Duration(seconds: 2));
 
-      final soundAssets = manifest.listAssets()
+      final soundAssets = manifest
+          .listAssets()
           .where((key) =>
               key.startsWith('assets/sounds/') &&
               (key.endsWith('.mp3') ||
@@ -191,7 +195,8 @@ class SoundPreviewService {
       sounds.sort((a, b) => a.name.compareTo(b.name));
       return sounds;
     } on TimeoutException {
-      debugPrint('SoundPreviewService: Asset manifest loading timed out after 2 seconds');
+      debugPrint(
+          'SoundPreviewService: Asset manifest loading timed out after 2 seconds');
       return null;
     } catch (e) {
       debugPrint('SoundPreviewService: Error loading from AssetManifest: $e');
@@ -205,7 +210,8 @@ class SoundPreviewService {
         .replaceAll('_', ' ')
         .replaceAll('-', ' ')
         .split(' ')
-        .map((word) => word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1))
+        .map((word) =>
+            word.isEmpty ? '' : word[0].toUpperCase() + word.substring(1))
         .join(' ');
   }
 
@@ -224,7 +230,9 @@ class SoundPreviewService {
     if (lower.contains('ambient') || lower.contains('chime')) {
       return 'Soft, atmospheric chime';
     }
-    if (lower.contains('retro') || lower.contains('8bit') || lower.contains('8_bit')) {
+    if (lower.contains('retro') ||
+        lower.contains('8bit') ||
+        lower.contains('8_bit')) {
       return 'Nostalgic 8-bit style';
     }
     if (lower.contains('gentle') || lower.contains('bell')) {
@@ -287,7 +295,8 @@ class SoundPreviewService {
         _isPlaying = true;
         _currentSoundId = soundId;
         _stateController.add(true);
-        debugPrint('SoundPreviewService: Playing $soundId (clean path: $cleanPath)');
+        debugPrint(
+            'SoundPreviewService: Playing $soundId (clean path: $cleanPath)');
       }
     } catch (e) {
       debugPrint('SoundPreviewService: Error playing sound: $e');
@@ -319,7 +328,8 @@ class SoundPreviewService {
   }
 
   /// Get all available sounds for current platform
-  Future<List<NotificationSound>> getAvailableSounds({String? customSystemSoundUri}) async {
+  Future<List<NotificationSound>> getAvailableSounds(
+      {String? customSystemSoundUri}) async {
     final assetSounds = await _loadAssetSounds();
 
     if (kIsWeb) {
@@ -329,23 +339,27 @@ class SoundPreviewService {
       // On Android, include asset sounds + option for system picker
       final sounds = List<NotificationSound>.from(assetSounds);
       if (customSystemSoundUri != null && customSystemSoundUri.isNotEmpty) {
-        sounds.insert(0, NotificationSound(
-          id: 'system_custom',
-          name: 'Custom System Sound',
-          assetPath: '',
-          description: 'Selected from system ringtone picker',
-          isSystemSound: true,
-          systemUri: customSystemSoundUri,
-        ));
+        sounds.insert(
+            0,
+            NotificationSound(
+              id: 'system_custom',
+              name: 'Custom System Sound',
+              assetPath: '',
+              description: 'Selected from system ringtone picker',
+              isSystemSound: true,
+              systemUri: customSystemSoundUri,
+            ));
       } else {
-        sounds.insert(0, NotificationSound(
-          id: 'system_picker',
-          name: 'Pick from System…',
-          assetPath: '',
-          description: 'Open system ringtone picker',
-          isSystemSound: true,
-          isPicker: true,
-        ));
+        sounds.insert(
+            0,
+            NotificationSound(
+              id: 'system_picker',
+              name: 'Pick from System…',
+              assetPath: '',
+              description: 'Open system ringtone picker',
+              isSystemSound: true,
+              isPicker: true,
+            ));
       }
       return sounds;
     }

@@ -36,7 +36,8 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
 
   // Use ValueNotifier for localized rebuilds of the play button only
   final ValueNotifier<bool> _isPlayingNotifier = ValueNotifier<bool>(false);
-  final ValueNotifier<String?> _playingSoundIdNotifier = ValueNotifier<String?>(null);
+  final ValueNotifier<String?> _playingSoundIdNotifier =
+      ValueNotifier<String?>(null);
 
   // Cache sounds to avoid reloading on every build
   List<NotificationSound> _availableSounds = [];
@@ -48,17 +49,19 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
     super.initState();
     _playingSubscription = _soundService.isPlayingStream.listen((playing) {
       _isPlayingNotifier.value = playing;
-      _playingSoundIdNotifier.value = playing ? _soundService.currentSoundId : null;
+      _playingSoundIdNotifier.value =
+          playing ? _soundService.currentSoundId : null;
     });
     _loadAndValidateSounds();
   }
 
   Future<void> _loadAndValidateSounds() async {
     if (_soundsLoaded) return;
-    
+
     // First, validate and correct the selected sound ID
-    _validatedSoundId = await _soundService.validateSoundId(widget.selectedSoundId);
-    
+    _validatedSoundId =
+        await _soundService.validateSoundId(widget.selectedSoundId);
+
     final sounds = await _soundService.getAvailableSounds(
       customSystemSoundUri: widget.customSystemSoundUri,
     );
@@ -82,16 +85,16 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
   Widget build(BuildContext context) {
     // Use the validated sound ID for the form field
     final effectiveSoundId = _validatedSoundId ?? widget.selectedSoundId;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           widget.label,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: Colors.white70,
-            fontWeight: FontWeight.w500,
-          ),
+                color: Colors.white70,
+                fontWeight: FontWeight.w500,
+              ),
         ),
         const SizedBox(height: 8),
         if (!_soundsLoaded)
@@ -121,7 +124,8 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: AppTheme.cyan, width: 1.5),
+                      borderSide:
+                          const BorderSide(color: AppTheme.cyan, width: 1.5),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -182,7 +186,8 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
                   onChanged: (value) {
                     if (value == null) return;
 
-                    final sound = _availableSounds.firstWhere((s) => s.id == value);
+                    final sound =
+                        _availableSounds.firstWhere((s) => s.id == value);
 
                     if (sound.isPicker) {
                       // Trigger system picker
@@ -234,7 +239,8 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
         return ValueListenableBuilder<String?>(
           valueListenable: _playingSoundIdNotifier,
           builder: (context, playingSoundId, _) {
-            final isCurrentPlaying = isPlaying && playingSoundId == effectiveSoundId;
+            final isCurrentPlaying =
+                isPlaying && playingSoundId == effectiveSoundId;
 
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -260,7 +266,8 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
                           style: TextStyle(
                             fontWeight: FontWeight.w500,
                             fontSize: 13,
-                            color: isCurrentPlaying ? AppTheme.cyan : Colors.white,
+                            color:
+                                isCurrentPlaying ? AppTheme.cyan : Colors.white,
                           ),
                         ),
                         if (currentSound.description.isNotEmpty)
@@ -287,21 +294,26 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
                       return ValueListenableBuilder<String?>(
                         valueListenable: _playingSoundIdNotifier,
                         builder: (context, playingSoundId, __) {
-                          final isCurrentPlaying = _isPlayingNotifier.value && playingSoundId == effectiveSoundId;
+                          final isCurrentPlaying = _isPlayingNotifier.value &&
+                              playingSoundId == effectiveSoundId;
                           return _GlowingPlayButton(
                             isPlaying: isCurrentPlaying,
-                            color: isCurrentPlaying ? AppTheme.cyan : AppTheme.purple,
+                            color: isCurrentPlaying
+                                ? AppTheme.cyan
+                                : AppTheme.purple,
                             onPressed: () async {
                               if (isCurrentPlaying) {
                                 await _soundService.stop();
                               } else {
-                                if (currentSound.isSystemSound && currentSound.systemUri != null) {
+                                if (currentSound.isSystemSound &&
+                                    currentSound.systemUri != null) {
                                   await _soundService.playSound(
                                     effectiveSoundId,
                                     customUri: currentSound.systemUri,
                                   );
                                 } else {
-                                  await _soundService.playSound(effectiveSoundId);
+                                  await _soundService
+                                      .playSound(effectiveSoundId);
                                 }
                               }
                             },
@@ -405,7 +417,9 @@ class _GlowingPlayButtonState extends State<_GlowingPlayButton>
                   ),
                 ),
                 child: Icon(
-                  widget.isPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                  widget.isPlaying
+                      ? Icons.stop_rounded
+                      : Icons.play_arrow_rounded,
                   color: Colors.white,
                   size: 24,
                 ),

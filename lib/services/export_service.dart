@@ -68,7 +68,8 @@ class ExportService {
     final fileName =
         'twince_backup_${DateTime.now().toIso8601String().replaceAll(':', '-')}.json';
     final path = await writeExportFile(fileName, contents);
-    if (path == null || kIsWeb) return const ExportResult(ExportStatus.unavailable);
+    if (path == null || kIsWeb)
+      return const ExportResult(ExportStatus.unavailable);
 
     await _channel.invokeMethod<void>('shareFile', <String, dynamic>{
       'path': path,
@@ -98,6 +99,10 @@ class ExportService {
         'customSystemSoundUri': task.customSystemSoundUri,
         'notificationTimerOptions':
             task.notificationTimerOptions.map((option) => option.name).toList(),
+        'isAlarm': task.isAlarm,
+        'alarmSoundType': task.alarmSoundType.name,
+        'alarmSoundId': task.alarmSoundId,
+        'alarmSoundUri': task.alarmSoundUri,
       };
 
   Map<String, dynamic> _recurringToJson(RecurringTask task) => {
@@ -118,6 +123,10 @@ class ExportService {
         'customSystemSoundUri': task.customSystemSoundUri,
         'notificationTimerOptions':
             task.notificationTimerOptions.map((option) => option.name).toList(),
+        'isAlarm': task.isAlarm,
+        'alarmSoundType': task.alarmSoundType.name,
+        'alarmSoundId': task.alarmSoundId,
+        'alarmSoundUri': task.alarmSoundUri,
       };
 
   Map<String, dynamic> _notificationPreferences(Task task) => {
@@ -127,14 +136,23 @@ class ExportService {
         'timerOptions':
             task.notificationTimerOptions.map((option) => option.name).toList(),
         'customMessage': task.customNotificationMessage,
+        'isAlarm': task.isAlarm,
+        'alarmSoundType': task.alarmSoundType.name,
+        'alarmSoundId': task.alarmSoundId,
+        'alarmSoundUri': task.alarmSoundUri,
       };
 
-  Map<String, dynamic> _recurringNotificationPreferences(RecurringTask task) => {
+  Map<String, dynamic> _recurringNotificationPreferences(RecurringTask task) =>
+      {
         'recurringDefinitionId': task.id,
         'soundId': task.notificationSoundId,
         'customSystemSoundUri': task.customSystemSoundUri,
         'timerOptions':
             task.notificationTimerOptions.map((option) => option.name).toList(),
         'customMessage': task.customNotificationMessage,
+        'isAlarm': task.isAlarm,
+        'alarmSoundType': task.alarmSoundType.name,
+        'alarmSoundId': task.alarmSoundId,
+        'alarmSoundUri': task.alarmSoundUri,
       };
 }

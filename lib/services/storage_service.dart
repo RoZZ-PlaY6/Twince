@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/task.dart';
 import '../models/recurring_task.dart';
 import 'notification_service.dart';
+import 'alarm_service.dart';
 
 /// The sole writer for tasks, keeping Hive and scheduled alarms in sync.
 class StorageService extends ChangeNotifier {
@@ -11,6 +12,7 @@ class StorageService extends ChangeNotifier {
     this._box,
     this._recurringBox,
     this._notifications,
+    this._alarms,
     this.onTaskUpdatedCallback,
     this.onTaskDeletedCallback,
     this.onTaskCompletedCallback,
@@ -19,6 +21,7 @@ class StorageService extends ChangeNotifier {
   final Box<Task> _box;
   final Box<RecurringTask> _recurringBox;
   final NotificationService? _notifications;
+  final AlarmService? _alarms;
   final void Function(Task)? onTaskUpdatedCallback;
   final void Function(String)? onTaskDeletedCallback;
   final void Function(String)? onTaskCompletedCallback;
@@ -26,6 +29,7 @@ class StorageService extends ChangeNotifier {
 
   static Future<StorageService> initialize(
     NotificationService? notifications, {
+    AlarmService? alarms,
     void Function(Task)? onTaskUpdated,
     void Function(String)? onTaskDeleted,
     void Function(String)? onTaskCompleted,
@@ -59,6 +63,7 @@ class StorageService extends ChangeNotifier {
       box,
       recurringBox,
       notifications,
+      alarms,
       onTaskUpdated,
       onTaskDeleted,
       onTaskCompleted,
@@ -85,7 +90,45 @@ class StorageService extends ChangeNotifier {
       throw StateError('Recurring task not found');
     }
     await _recurringBox.put(definition.id, definition);
+    await _propagateRecurringDefinition(definition);
     await generateRecurringInstances();
+  }
+
+  Future<void> _propagateRecurringDefinition(RecurringTask definition) async {
+    final now = DateTime.now();
+    final occurrences = getAllTasks().where((task) =>
+        task.recurringDefinitionId == definition.id &&
+        task.status == TaskStatus.pending &&
+        task.startTime.isAfter(now));
+    for (final existing in occurrences) {
+      if (!definition.weekdays.contains(existing.targetDate.weekday)) {
+        await deleteTask(existing.id);
+        continue;
+      }
+      final generated = definition.occurrenceOn(existing.targetDate);
+      await updateTask(existing.copyWith(
+        title: generated.title,
+        description: generated.description,
+        category: generated.category,
+        isTimeBound: generated.isTimeBound,
+        targetDate: generated.targetDate,
+        startTime: generated.startTime,
+        endTime: generated.endTime,
+        reminderIntervalMinutes: generated.reminderIntervalMinutes,
+        customNotificationMessage: generated.customNotificationMessage,
+        clearCustomNotificationMessage:
+            generated.customNotificationMessage == null,
+        notificationSoundId: generated.notificationSoundId,
+        customSystemSoundUri: generated.customSystemSoundUri,
+        clearCustomSystemSoundUri: generated.customSystemSoundUri == null,
+        notificationTimerOptions: generated.notificationTimerOptions,
+        isAlarm: generated.isAlarm,
+        alarmSoundType: generated.alarmSoundType,
+        alarmSoundId: generated.alarmSoundId,
+        alarmSoundUri: generated.alarmSoundUri,
+        clearAlarmSoundUri: generated.alarmSoundUri == null,
+      ));
+    }
   }
 
   /// Maintains a rolling week; missed dates are backfilled on the next launch.
@@ -131,11 +174,19 @@ class StorageService extends ChangeNotifier {
 
   /// Schedules or reschedules reminders for a task
   Future<void> _scheduleTaskReminders(Task task) async {
-    debugPrint('StorageService: Scheduling reminders for "${task.title}" (${task.id})');
+    debugPrint(
+        'StorageService: Scheduling reminders for "${task.title}" (${task.id})');
     if (!kIsWeb) {
       await _notifications?.scheduleTask(task);
     } else {
       await _notifications?.scheduleTask(task);
+    }
+    if (task.isAlarm &&
+        task.status == TaskStatus.pending &&
+        task.startTime.isAfter(DateTime.now())) {
+      await _alarms?.schedule(task);
+    } else {
+      await _alarms?.cancel(task.id);
     }
   }
 
@@ -147,6 +198,7 @@ class StorageService extends ChangeNotifier {
     } else {
       await _notifications?.cancelTask(taskId);
     }
+    await _alarms?.cancel(taskId);
   }
 
   List<Task> getAllTasks() {
@@ -243,7 +295,8 @@ class StorageService extends ChangeNotifier {
     await _box.put(id, task.copyWith(status: TaskStatus.failed));
     notifyListeners();
     await _cancelTaskReminders(id);
-    onTaskCompletedCallback?.call(id); // Treat failed same as completed for cleanup
+    onTaskCompletedCallback
+        ?.call(id); // Treat failed same as completed for cleanup
   }
 
   /// Reconciles all task reminders - call on app startup and resume
@@ -279,6 +332,9 @@ class StorageService extends ChangeNotifier {
 
   /// Clears all tasks and recurring tasks from storage
   Future<void> clearAllData() async {
+    for (final task in _box.values) {
+      await _cancelTaskReminders(task.id);
+    }
     await _box.clear();
     await _recurringBox.clear();
     notifyListeners();

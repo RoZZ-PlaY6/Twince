@@ -5,18 +5,25 @@ enum TaskStatus { pending, completed, failed }
 
 enum TaskCategory { daily, important, etc }
 
+enum AlarmSoundType { system, builtIn, customFile }
+
 /// Notification timer options for task reminders.
 enum NotificationTimerOption {
   /// Every full hour before task ends (only available for tasks > 1 hour)
   everyHour,
+
   /// 30 minutes before task ends
   thirtyMinutes,
+
   /// 15 minutes before task ends
   fifteenMinutes,
+
   /// 10 minutes before task ends
   tenMinutes,
+
   /// 5 minutes before task ends
   fiveMinutes,
+
   /// 5x - one notification per minute in the last 5 minutes
   fiveTimes,
 }
@@ -24,38 +31,46 @@ enum NotificationTimerOption {
 /// Extension for display labels and durations
 extension NotificationTimerOptionX on NotificationTimerOption {
   String get label => switch (this) {
-    NotificationTimerOption.everyHour => 'Every hour',
-    NotificationTimerOption.thirtyMinutes => '30 minutes before the end',
-    NotificationTimerOption.fifteenMinutes => '15 minutes before the end',
-    NotificationTimerOption.tenMinutes => '10 minutes before the end',
-    NotificationTimerOption.fiveMinutes => '5 minutes before the end',
-    NotificationTimerOption.fiveTimes => '5x (last 5 minutes, every minute)',
-  };
+        NotificationTimerOption.everyHour => 'Every hour',
+        NotificationTimerOption.thirtyMinutes => '30 minutes before the end',
+        NotificationTimerOption.fifteenMinutes => '15 minutes before the end',
+        NotificationTimerOption.tenMinutes => '10 minutes before the end',
+        NotificationTimerOption.fiveMinutes => '5 minutes before the end',
+        NotificationTimerOption.fiveTimes =>
+          '5x (last 5 minutes, every minute)',
+      };
 
   String get description => switch (this) {
-    NotificationTimerOption.everyHour => 'Notifies every full hour before the task ends (available for tasks > 1 hour)',
-    NotificationTimerOption.thirtyMinutes => 'Notifies 30 minutes before the task ends',
-    NotificationTimerOption.fifteenMinutes => 'Notifies 15 minutes before the task ends',
-    NotificationTimerOption.tenMinutes => 'Notifies 10 minutes before the task ends',
-    NotificationTimerOption.fiveMinutes => 'Notifies 5 minutes before the task ends',
-    NotificationTimerOption.fiveTimes => 'Notifies every minute in the last 5 minutes (5, 4, 3, 2, 1 min remaining)',
-  };
+        NotificationTimerOption.everyHour =>
+          'Notifies every full hour before the task ends (available for tasks > 1 hour)',
+        NotificationTimerOption.thirtyMinutes =>
+          'Notifies 30 minutes before the task ends',
+        NotificationTimerOption.fifteenMinutes =>
+          'Notifies 15 minutes before the task ends',
+        NotificationTimerOption.tenMinutes =>
+          'Notifies 10 minutes before the task ends',
+        NotificationTimerOption.fiveMinutes =>
+          'Notifies 5 minutes before the task ends',
+        NotificationTimerOption.fiveTimes =>
+          'Notifies every minute in the last 5 minutes (5, 4, 3, 2, 1 min remaining)',
+      };
 
   /// Returns the minutes before end for fixed options, null for everyHour and fiveTimes
   int? get minutesBeforeEnd => switch (this) {
-    NotificationTimerOption.everyHour => null,
-    NotificationTimerOption.thirtyMinutes => 30,
-    NotificationTimerOption.fifteenMinutes => 15,
-    NotificationTimerOption.tenMinutes => 10,
-    NotificationTimerOption.fiveMinutes => 5,
-    NotificationTimerOption.fiveTimes => null,
-  };
+        NotificationTimerOption.everyHour => null,
+        NotificationTimerOption.thirtyMinutes => 30,
+        NotificationTimerOption.fifteenMinutes => 15,
+        NotificationTimerOption.tenMinutes => 10,
+        NotificationTimerOption.fiveMinutes => 5,
+        NotificationTimerOption.fiveTimes => null,
+      };
 
   /// Whether this option is available for the given task duration
   bool isAvailableForDuration(Duration duration) => switch (this) {
-    NotificationTimerOption.everyHour => duration > const Duration(hours: 1),
-    _ => true,
-  };
+        NotificationTimerOption.everyHour =>
+          duration > const Duration(hours: 1),
+        _ => true,
+      };
 }
 
 extension TaskCategoryX on TaskCategory {
@@ -93,6 +108,10 @@ class Task {
     this.notificationSoundId = 'cyber_pulse',
     this.customSystemSoundUri,
     this.notificationTimerOptions = const {},
+    this.isAlarm = false,
+    this.alarmSoundType = AlarmSoundType.system,
+    this.alarmSoundId = 'cyber_pulse',
+    this.alarmSoundUri,
   })  : id = id ?? const Uuid().v4(),
         title = title.trim(),
         createdAt = createdAt ?? DateTime.now() {
@@ -104,14 +123,17 @@ class Task {
       throw ArgumentError('End time must be after start time');
     }
     if (isTimeBound) {
-      final startDay = DateTime(targetDate.year, targetDate.month, targetDate.day);
+      final startDay =
+          DateTime(targetDate.year, targetDate.month, targetDate.day);
       final endDay = DateTime(endTime.year, endTime.month, endTime.day);
       final nextDay = startDay.add(const Duration(days: 1));
-      if (startTime.isBefore(startDay) || startTime.isAfter(startDay.add(const Duration(days: 1)))) {
+      if (startTime.isBefore(startDay) ||
+          startTime.isAfter(startDay.add(const Duration(days: 1)))) {
         throw ArgumentError('Start time must be on the target date');
       }
       if (endDay.isBefore(startDay) || endDay.isAfter(nextDay)) {
-        throw ArgumentError('End time must be on the target date or the next day');
+        throw ArgumentError(
+            'End time must be on the target date or the next day');
       }
     }
   }
@@ -144,8 +166,16 @@ class Task {
   /// Selected notification timer options for this task.
   final Set<NotificationTimerOption> notificationTimerOptions;
 
+  /// Whether an exact, full-screen alarm should ring at [startTime].
+  final bool isAlarm;
+
+  final AlarmSoundType alarmSoundType;
+  final String alarmSoundId;
+  final String? alarmSoundUri;
+
   bool get hasCustomNotificationMessage =>
-      customNotificationMessage != null && customNotificationMessage!.trim().isNotEmpty;
+      customNotificationMessage != null &&
+      customNotificationMessage!.trim().isNotEmpty;
 
   Task copyWith({
     String? title,
@@ -166,6 +196,11 @@ class Task {
     String? customSystemSoundUri,
     bool clearCustomSystemSoundUri = false,
     Set<NotificationTimerOption>? notificationTimerOptions,
+    bool? isAlarm,
+    AlarmSoundType? alarmSoundType,
+    String? alarmSoundId,
+    String? alarmSoundUri,
+    bool clearAlarmSoundUri = false,
   }) =>
       Task(
         id: id,
@@ -192,6 +227,11 @@ class Task {
             : customSystemSoundUri ?? this.customSystemSoundUri,
         notificationTimerOptions:
             notificationTimerOptions ?? this.notificationTimerOptions,
+        isAlarm: isAlarm ?? this.isAlarm,
+        alarmSoundType: alarmSoundType ?? this.alarmSoundType,
+        alarmSoundId: alarmSoundId ?? this.alarmSoundId,
+        alarmSoundUri:
+            clearAlarmSoundUri ? null : alarmSoundUri ?? this.alarmSoundUri,
       );
 }
 
@@ -211,7 +251,8 @@ class TaskAdapter extends TypeAdapter<Task> {
     final categoryValue = fields[3];
     TaskCategory category;
     if (categoryValue is int) {
-      category = TaskCategory.values[categoryValue.clamp(0, TaskCategory.values.length - 1)];
+      category = TaskCategory
+          .values[categoryValue.clamp(0, TaskCategory.values.length - 1)];
     } else if (categoryValue is String) {
       category = TaskCategoryX.fromString(categoryValue);
     } else {
@@ -222,6 +263,7 @@ class TaskAdapter extends TypeAdapter<Task> {
     final notificationSoundId = fields[14] as String? ?? 'cyber_pulse';
     final customSystemSoundUri = fields[15] as String?;
     final notificationTimerOptions = fields[16] as List?;
+    final alarmSoundTypeIndex = fields[18] as int? ?? 0;
     return Task(
       id: fields[0] as String,
       title: fields[1] as String,
@@ -244,13 +286,18 @@ class TaskAdapter extends TypeAdapter<Task> {
               .map((e) => NotificationTimerOption.values[e as int])
               .toSet()
           : const {},
+      isAlarm: fields[17] as bool? ?? false,
+      alarmSoundType: AlarmSoundType.values[
+          alarmSoundTypeIndex.clamp(0, AlarmSoundType.values.length - 1)],
+      alarmSoundId: fields[19] as String? ?? 'cyber_pulse',
+      alarmSoundUri: fields[20] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Task task) {
     writer
-      ..writeByte(17) // Updated field count
+      ..writeByte(21)
       ..writeByte(0)
       ..write(task.id)
       ..writeByte(1)
@@ -284,6 +331,14 @@ class TaskAdapter extends TypeAdapter<Task> {
       ..writeByte(15)
       ..write(task.customSystemSoundUri)
       ..writeByte(16)
-      ..write(task.notificationTimerOptions.map((e) => e.index).toList());
+      ..write(task.notificationTimerOptions.map((e) => e.index).toList())
+      ..writeByte(17)
+      ..write(task.isAlarm)
+      ..writeByte(18)
+      ..write(task.alarmSoundType.index)
+      ..writeByte(19)
+      ..write(task.alarmSoundId)
+      ..writeByte(20)
+      ..write(task.alarmSoundUri);
   }
 }

@@ -13,7 +13,8 @@ class ImportService {
   static final instance = ImportService._();
   static const _channel = MethodChannel('twince/import');
 
-  Future<ImportResult> importFromJson(StorageService storage, String jsonContent) async {
+  Future<ImportResult> importFromJson(
+      StorageService storage, String jsonContent) async {
     Map<String, dynamic> payload;
     try {
       payload = jsonDecode(jsonContent) as Map<String, dynamic>;
@@ -73,7 +74,8 @@ class ImportService {
       await storage.generateRecurringInstances();
       await storage.reconcile();
 
-      return ImportResult(ImportStatus.success, tasksImported: tasksImported, recurringImported: recurringImported);
+      return ImportResult(ImportStatus.success,
+          tasksImported: tasksImported, recurringImported: recurringImported);
     } catch (e) {
       debugPrint('Import failed: $e');
       return const ImportResult(ImportStatus.invalidFormat);
@@ -82,7 +84,8 @@ class ImportService {
 
   Future<ImportResult> pickAndImport(StorageService storage) async {
     try {
-      final result = await _channel.invokeMethod<String>('pickAndReadFile', <String, dynamic>{
+      final result = await _channel
+          .invokeMethod<String>('pickAndReadFile', <String, dynamic>{
         'allowedExtensions': ['json'],
         'mimeType': 'application/json',
       });
@@ -114,15 +117,22 @@ class ImportService {
       endTime: DateTime.parse(json['endTime'] as String),
       reminderIntervalMinutes: json['reminderIntervalMinutes'] as int? ?? 60,
       createdAt: DateTime.parse(json['createdAt'] as String),
-      completedAt: json['completedAt'] != null ? DateTime.parse(json['completedAt'] as String) : null,
+      completedAt: json['completedAt'] != null
+          ? DateTime.parse(json['completedAt'] as String)
+          : null,
       recurringDefinitionId: json['recurringDefinitionId'] as String?,
       customNotificationMessage: json['customNotificationMessage'] as String?,
-      notificationSoundId: json['notificationSoundId'] as String? ?? 'cyber_pulse',
+      notificationSoundId:
+          json['notificationSoundId'] as String? ?? 'cyber_pulse',
       customSystemSoundUri: json['customSystemSoundUri'] as String?,
       notificationTimerOptions: (json['notificationTimerOptions'] as List?)
               ?.map((e) => NotificationTimerOption.values.byName(e as String))
               .toSet() ??
           const {},
+      isAlarm: json['isAlarm'] as bool? ?? false,
+      alarmSoundType: _alarmSoundType(json['alarmSoundType']),
+      alarmSoundId: json['alarmSoundId'] as String? ?? 'cyber_pulse',
+      alarmSoundUri: json['alarmSoundUri'] as String?,
     );
   }
 
@@ -139,14 +149,25 @@ class ImportService {
       isTimeBound: json['isTimeBound'] as bool? ?? true,
       reminderIntervalMinutes: json['reminderIntervalMinutes'] as int? ?? 60,
       createdAt: DateTime.parse(json['createdAt'] as String),
-      generatedThrough: json['generatedThrough'] != null ? DateTime.parse(json['generatedThrough'] as String) : null,
+      generatedThrough: json['generatedThrough'] != null
+          ? DateTime.parse(json['generatedThrough'] as String)
+          : null,
       customNotificationMessage: json['customNotificationMessage'] as String?,
-      notificationSoundId: json['notificationSoundId'] as String? ?? 'cyber_pulse',
+      notificationSoundId:
+          json['notificationSoundId'] as String? ?? 'cyber_pulse',
       customSystemSoundUri: json['customSystemSoundUri'] as String?,
       notificationTimerOptions: (json['notificationTimerOptions'] as List?)
               ?.map((e) => NotificationTimerOption.values.byName(e as String))
               .toSet() ??
           const {},
+      isAlarm: json['isAlarm'] as bool? ?? false,
+      alarmSoundType: _alarmSoundType(json['alarmSoundType']),
+      alarmSoundId: json['alarmSoundId'] as String? ?? 'cyber_pulse',
+      alarmSoundUri: json['alarmSoundUri'] as String?,
     );
   }
+
+  AlarmSoundType _alarmSoundType(Object? value) =>
+      AlarmSoundType.values.where((type) => type.name == value).firstOrNull ??
+      AlarmSoundType.system;
 }

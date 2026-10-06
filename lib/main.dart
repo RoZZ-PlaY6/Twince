@@ -4,6 +4,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 
 import 'screens/home_screen.dart';
 import 'services/notification_service.dart';
+import 'services/alarm_service.dart';
 import 'services/reminder_scheduler_service.dart';
 import 'services/storage_service.dart';
 import 'services/time_watcher_service.dart';
@@ -11,16 +12,19 @@ import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize timezone database (required before using tz.local)
   tz.initializeTimeZones();
-  
+
   try {
     // Initialize NotificationService on all platforms
     final notifications = NotificationService.instance;
     await notifications.initialize();
-    
-    final storage = await StorageService.initialize(notifications);
+
+    final storage = await StorageService.initialize(
+      notifications,
+      alarms: AlarmService.instance,
+    );
     await storage.reconcile();
 
     // Initialize and start the foreground reminder scheduler
@@ -84,7 +88,7 @@ class TwinceApp extends StatefulWidget {
   State<TwinceApp> createState() => _TwinceAppState();
 }
 
-class _TwinceAppState extends State<TwinceApp> {
+class _TwinceAppState extends State<TwinceApp> with WidgetsBindingObserver {
   late final TimeWatcherService _watcher;
   late final ReminderSchedulerService _reminderScheduler;
 
@@ -93,12 +97,21 @@ class _TwinceAppState extends State<TwinceApp> {
     super.initState();
     _watcher = TimeWatcherService(widget.storage)..start();
     _reminderScheduler = widget.reminderScheduler;
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      widget.storage.reconcile();
+    }
   }
 
   @override
   void dispose() {
     _watcher.dispose();
     _reminderScheduler.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
