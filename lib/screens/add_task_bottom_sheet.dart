@@ -35,6 +35,7 @@ ResolvedTaskSchedule resolveTaskSchedule({
   var taskDay =
       DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
   final today = DateTime(localNow.year, localNow.month, localNow.day);
+  if (adjustPassedAlarm && taskDay.isBefore(today)) taskDay = today;
 
   DateTime combine(DateTime day, DateTime clock) => DateTime(
         day.year,
