@@ -5,7 +5,8 @@ export 'import_service_stub.dart'
 enum ImportStatus { success, invalidFormat, noData, unavailable }
 
 class ImportResult {
-  const ImportResult(this.status, {this.tasksImported = 0, this.recurringImported = 0});
+  const ImportResult(this.status,
+      {this.tasksImported = 0, this.recurringImported = 0});
   final ImportStatus status;
   final int tasksImported;
   final int recurringImported;

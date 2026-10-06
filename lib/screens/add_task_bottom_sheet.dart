@@ -5,14 +5,22 @@ import 'package:intl/intl.dart';
 import '../models/task.dart';
 import '../models/recurring_task.dart';
 import '../services/storage_service.dart';
+import '../services/alarm_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/alarm_sound_picker.dart';
 import '../widgets/precise_time_picker.dart';
 import '../widgets/sound_picker_field.dart';
 
 class AddTaskBottomSheet extends StatefulWidget {
-  const AddTaskBottomSheet({super.key, required this.storage, this.task});
+  const AddTaskBottomSheet({
+    super.key,
+    required this.storage,
+    this.task,
+    this.initialAlarmEnabled = false,
+  });
   final StorageService storage;
   final Task? task;
+  final bool initialAlarmEnabled;
 
   @override
   State<AddTaskBottomSheet> createState() => _AddTaskBottomSheetState();
@@ -34,6 +42,10 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
   bool _recurring = false;
   final Set<int> _weekdays = {};
   Set<NotificationTimerOption> _notificationTimerOptions = {};
+  late bool _isAlarm;
+  AlarmSoundType _alarmSoundType = AlarmSoundType.system;
+  String _alarmSoundId = 'cyber_pulse';
+  String? _alarmSoundUri;
 
   // Track if we're editing a recurring task (not just an occurrence)
   RecurringTask? _editingRecurringTask;
@@ -43,6 +55,7 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
   @override
   void initState() {
     super.initState();
+    _isAlarm = widget.initialAlarmEnabled;
     final task = widget.task;
     if (task == null) return;
     _title.text = task.title;
@@ -52,18 +65,36 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
     _start = task.startTime;
     _end = task.endTime;
     _intervalController.text = task.reminderIntervalMinutes.toString();
-    _customMessageController.text = task.customNotificationMessage?.trim() ?? '';
+    _customMessageController.text =
+        task.customNotificationMessage?.trim() ?? '';
     _notificationSoundId = task.notificationSoundId;
     _customSystemSoundUri = task.customSystemSoundUri;
     _notificationTimerOptions = task.notificationTimerOptions;
+    _isAlarm = task.isAlarm;
+    _alarmSoundType = task.alarmSoundType;
+    _alarmSoundId = task.alarmSoundId;
+    _alarmSoundUri = task.alarmSoundUri;
 
-    // An occurrence opens in single-task edit mode. Editing the series is explicit.
+    // If this task was generated from a recurring definition, load the series.
     if (task.recurringDefinitionId != null) {
-      _editingRecurringTask =
-          widget.storage.getRecurringTaskById(task.recurringDefinitionId!);
-      if (_editingRecurringTask != null) {
-        _weekdays.addAll(_editingRecurringTask!.weekdays);
+      _loadRecurringDefinition(task.recurringDefinitionId!);
+    }
+  }
+
+  Future<void> _loadRecurringDefinition(String recurringId) async {
+    try {
+      final recurringTask = widget.storage.getRecurringTaskById(recurringId);
+      if (recurringTask != null && mounted) {
+        setState(() {
+          _editingRecurringTask = recurringTask;
+          _recurring = true;
+          _weekdays
+            ..clear()
+            ..addAll(recurringTask.weekdays);
+        });
       }
+    } catch (error) {
+      debugPrint('Could not load recurring definition: $error');
     }
   }
 
@@ -90,7 +121,7 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
     if (widget.task == null) {
       return _recurring ? 'Create recurring task' : 'Create task';
     }
-    if (_editingRecurringTask != null && _recurring) return 'Update recurring task';
+    if (_editingRecurringTask != null) return 'Update recurring task';
     if (_recurring) return 'Update recurring task';
     return 'Save changes';
   }
@@ -113,9 +144,9 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
         Text(
           'Notification Timer Messages',
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: Colors.white70,
-            fontWeight: FontWeight.w500,
-          ),
+                color: Colors.white70,
+                fontWeight: FontWeight.w500,
+              ),
         ),
         const SizedBox(height: 8),
         Text(
@@ -127,7 +158,8 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
           spacing: 8,
           runSpacing: 8,
           children: options.map((option) {
-            final isAvailable = option.isAvailableForDuration(_effectiveEnd().difference(_at(_start)));
+            final isAvailable = option.isAvailableForDuration(
+                _effectiveEnd().difference(_at(_start)));
             final isSelected = _notificationTimerOptions.contains(option);
 
             return FilterChip(
@@ -158,7 +190,9 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
               ),
               side: BorderSide(
                 color: isAvailable
-                    ? (isSelected ? AppTheme.cyan : AppTheme.purple.withOpacity(0.5))
+                    ? (isSelected
+                        ? AppTheme.cyan
+                        : AppTheme.purple.withOpacity(0.5))
                     : Colors.white24,
               ),
             );
@@ -168,7 +202,10 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
           const SizedBox(height: 8),
           Text(
             'Selected: ${_notificationTimerOptions.map((o) => o.label).join(', ')}',
-            style: TextStyle(color: AppTheme.cyan, fontSize: 12, fontWeight: FontWeight.w500),
+            style: TextStyle(
+                color: AppTheme.cyan,
+                fontSize: 12,
+                fontWeight: FontWeight.w500),
           ),
         ],
       ],
@@ -187,7 +224,8 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
     final interval = int.tryParse(_intervalController.text.trim());
     if (interval == null || interval < 1) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reminder interval must be a positive integer')),
+        const SnackBar(
+            content: Text('Reminder interval must be a positive integer')),
       );
       return;
     }
@@ -207,6 +245,25 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Choose a future end time.')),
       );
+      return;
+    }
+    if (_isAlarm && !_at(_start).isAfter(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Alarm time must be in the future.')),
+      );
+      return;
+    }
+    if (_isAlarm && !await AlarmService.instance.canScheduleExactAlarms()) {
+      await AlarmService.instance.requestExactAlarmAccess();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Allow exact alarms in Android settings, then tap save again.',
+            ),
+          ),
+        );
+      }
       return;
     }
     setState(() => _saving = true);
@@ -236,6 +293,10 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
             notificationSoundId: _notificationSoundId,
             customSystemSoundUri: _customSystemSoundUri,
             notificationTimerOptions: _notificationTimerOptions,
+            isAlarm: _isAlarm,
+            alarmSoundType: _alarmSoundType,
+            alarmSoundId: _alarmSoundId,
+            alarmSoundUri: _alarmSoundUri,
           ));
         } else {
           await widget.storage.addTask(Task(
@@ -250,6 +311,10 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
             notificationSoundId: _notificationSoundId,
             customSystemSoundUri: _customSystemSoundUri,
             notificationTimerOptions: _notificationTimerOptions,
+            isAlarm: _isAlarm,
+            alarmSoundType: _alarmSoundType,
+            alarmSoundId: _alarmSoundId,
+            alarmSoundUri: _alarmSoundUri,
           ));
         }
       } else {
@@ -272,6 +337,10 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
             notificationSoundId: _notificationSoundId,
             customSystemSoundUri: _customSystemSoundUri,
             notificationTimerOptions: _notificationTimerOptions,
+            isAlarm: _isAlarm,
+            alarmSoundType: _alarmSoundType,
+            alarmSoundId: _alarmSoundId,
+            alarmSoundUri: _alarmSoundUri,
             createdAt: _editingRecurringTask!.createdAt,
             generatedThrough: _editingRecurringTask!.generatedThrough,
           );
@@ -289,6 +358,10 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
             notificationSoundId: _notificationSoundId,
             customSystemSoundUri: _customSystemSoundUri,
             notificationTimerOptions: _notificationTimerOptions,
+            isAlarm: _isAlarm,
+            alarmSoundType: _alarmSoundType,
+            alarmSoundId: _alarmSoundId,
+            alarmSoundUri: _alarmSoundUri,
           );
           if (_retrying) {
             await widget.storage.retryTask(edited);
@@ -372,22 +445,17 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
                   ),
                   const SizedBox(height: 12),
                   SwitchListTile(
-                    title: Text(_editingRecurringTask == null
-                        ? 'Recurring task'
-                        : 'Edit recurring series'),
-                    subtitle: Text(_editingRecurringTask == null
-                        ? 'Repeat on selected weekdays'
-                        : 'Changes to the series affect its future occurrences'),
+                    title: const Text('Recurring task'),
+                    subtitle: const Text('Repeat on selected weekdays'),
                     value: _recurring,
-                    onChanged: _retrying ||
-                            (widget.task != null && _editingRecurringTask == null)
+                    onChanged: _retrying
                         ? null
                         : (value) => setState(() {
-                            _recurring = value;
-                            if (value && _weekdays.isEmpty) {
-                              _weekdays.add(DateTime.now().weekday);
-                            }
-                          }),
+                              _recurring = value;
+                              if (value && _weekdays.isEmpty) {
+                                _weekdays.add(DateTime.now().weekday);
+                              }
+                            }),
                   ),
                   if (_recurring) ...[
                     const Text('Days of the week'),
@@ -471,6 +539,32 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
                     ],
                   ),
                   const SizedBox(height: 16),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Alarm'),
+                    subtitle: Text(
+                      _isAlarm
+                          ? 'Rings exactly at the task start time'
+                          : 'No full-screen alarm',
+                    ),
+                    secondary: const Icon(Icons.alarm, color: AppTheme.cyan),
+                    value: _isAlarm,
+                    onChanged: (value) => setState(() => _isAlarm = value),
+                  ),
+                  if (_isAlarm) ...[
+                    const SizedBox(height: 8),
+                    AlarmSoundPicker(
+                      type: _alarmSoundType,
+                      soundId: _alarmSoundId,
+                      soundUri: _alarmSoundUri,
+                      onChanged: (type, id, uri) => setState(() {
+                        _alarmSoundType = type;
+                        _alarmSoundId = id;
+                        _alarmSoundUri = uri;
+                      }),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   TextFormField(
                     controller: _intervalController,
                     decoration: const InputDecoration(

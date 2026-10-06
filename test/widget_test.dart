@@ -4,8 +4,58 @@ import 'package:twince/models/task.dart';
 import 'package:twince/widgets/task_card.dart';
 import 'package:twince/widgets/precise_time_picker.dart';
 import 'package:twince/widgets/test_notification_dialog.dart';
+import 'package:twince/widgets/alarm_sound_picker.dart';
+import 'package:twince/screens/home_screen.dart';
 
 void main() {
+  test('alarmed task filter keeps only pending future alarms', () {
+    final now = DateTime(2026, 10, 6, 12);
+    Task task(String title,
+            {bool alarm = true,
+            TaskStatus status = TaskStatus.pending,
+            bool future = true}) =>
+        Task(
+          title: title,
+          status: status,
+          targetDate: DateTime(2026, 10, 6),
+          startTime: future
+              ? now.add(const Duration(hours: 1))
+              : now.subtract(const Duration(hours: 1)),
+          endTime: future
+              ? now.add(const Duration(hours: 2))
+              : now.add(const Duration(minutes: 1)),
+          isAlarm: alarm,
+        );
+
+    final filtered = activeAlarmedTasks([
+      task('future alarm'),
+      task('normal task', alarm: false),
+      task('past alarm', future: false),
+      task('completed alarm', status: TaskStatus.completed),
+    ], now: now);
+
+    expect(filtered.map((task) => task.title), ['future alarm']);
+  });
+
+  testWidgets('alarm sound picker exposes all three sound sources',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: AlarmSoundPicker(
+          type: AlarmSoundType.builtIn,
+          soundId: 'cyber_pulse',
+          soundUri: null,
+          onChanged: (_, __, ___) {},
+        ),
+      ),
+    ));
+
+    expect(find.text('System'), findsOneWidget);
+    expect(find.text('App'), findsOneWidget);
+    expect(find.text('File'), findsOneWidget);
+    expect(find.text('Cyber Pulse'), findsOneWidget);
+  });
+
   testWidgets('failed tasks show a failed badge and struck-through title', (
     tester,
   ) async {
@@ -103,8 +153,7 @@ void main() {
     expect(selected, DateTime(2026, 10, 1, 20, 9, 10));
   });
 
-  testWidgets('time picker 12 AM becomes midnight',
-      (tester) async {
+  testWidgets('time picker 12 AM becomes midnight', (tester) async {
     DateTime? selected;
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(

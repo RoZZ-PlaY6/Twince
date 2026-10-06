@@ -5,7 +5,8 @@ class ImportService {
   ImportService._();
   static final instance = ImportService._();
 
-  Future<ImportResult> importFromJson(StorageService storage, String jsonContent) async {
+  Future<ImportResult> importFromJson(
+      StorageService storage, String jsonContent) async {
     return const ImportResult(ImportStatus.unavailable);
   }
 

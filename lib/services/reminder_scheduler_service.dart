@@ -30,7 +30,8 @@ class ReminderSchedulerService with WidgetsBindingObserver {
   void start() {
     WidgetsBinding.instance.addObserver(this);
     _ticker = Timer.periodic(_checkInterval, (_) => _checkActiveTasks());
-    debugPrint('[Twince-Reminder] Scheduler started, checking every ${_checkInterval.inSeconds}s');
+    debugPrint(
+        '[Twince-Reminder] Scheduler started, checking every ${_checkInterval.inSeconds}s');
     // Run initial check immediately
     _checkActiveTasks();
   }
@@ -49,11 +50,13 @@ class ReminderSchedulerService with WidgetsBindingObserver {
       }
 
       // Check if task is in active window (handles overnight via endTime comparison)
-      final isActive = !now.isBefore(task.startTime) && now.isBefore(task.endTime);
+      final isActive =
+          !now.isBefore(task.startTime) && now.isBefore(task.endTime);
       if (!isActive) {
         // Task not active - clean up last notified time
         if (_lastNotified.containsKey(task.id)) {
-          debugPrint('[Twince-Reminder] Task "${task.title}" (${task.id}) no longer active, clearing lastNotified');
+          debugPrint(
+              '[Twince-Reminder] Task "${task.title}" (${task.id}) no longer active, clearing lastNotified');
           _lastNotified.remove(task.id);
         }
         continue;
@@ -68,7 +71,8 @@ class ReminderSchedulerService with WidgetsBindingObserver {
 
       if (lastNotified == null) {
         // First notification in this active window - fire at first interval after startTime
-        final firstInterval = _getNextIntervalAfter(task.startTime, interval, now);
+        final firstInterval =
+            _getNextIntervalAfter(task.startTime, interval, now);
         if (!firstInterval.isAfter(now)) {
           shouldNotify = true;
         }
@@ -77,26 +81,31 @@ class ReminderSchedulerService with WidgetsBindingObserver {
       }
 
       if (shouldNotify) {
-        debugPrint('[Twince-Reminder] FIRING notification for "${task.title}" (${task.id}) '
+        debugPrint(
+            '[Twince-Reminder] FIRING notification for "${task.title}" (${task.id}) '
             'now=$now lastNotified=${_lastNotified[task.id]?.toString() ?? "never"} interval=${interval.inMinutes}min');
         await _fireNotification(task);
         _lastNotified[task.id] = now;
       } else {
-        final timeSinceLast = lastNotified != null ? now.difference(lastNotified) : null;
+        final timeSinceLast =
+            lastNotified != null ? now.difference(lastNotified) : null;
         final timeToNext = timeSinceLast != null
             ? interval - timeSinceLast
-            : _getNextIntervalAfter(task.startTime, interval, now).difference(now);
+            : _getNextIntervalAfter(task.startTime, interval, now)
+                .difference(now);
         debugPrint('[Twince-Reminder] Task "${task.title}" active - '
             'timeSinceLast=${timeSinceLast?.inSeconds ?? "N/A"}s '
             'timeToNext=${timeToNext.inSeconds}s');
       }
     }
 
-    debugPrint('[Twince-Reminder] Check complete: $activeCount active task(s), ${_lastNotified.length} tracked');
+    debugPrint(
+        '[Twince-Reminder] Check complete: $activeCount active task(s), ${_lastNotified.length} tracked');
   }
 
   /// Calculate the next interval boundary after [startTime] using [interval]
-  DateTime _getNextIntervalAfter(DateTime startTime, Duration interval, DateTime now) {
+  DateTime _getNextIntervalAfter(
+      DateTime startTime, Duration interval, DateTime now) {
     var next = startTime;
     while (next.isBefore(now)) {
       next = next.add(interval);
@@ -137,7 +146,8 @@ class ReminderSchedulerService with WidgetsBindingObserver {
   /// Update tracking when task interval/message changes
   void onTaskUpdated(Task task) {
     // If task is currently active, we keep tracking but next check will use new interval
-    debugPrint('[Twince-Reminder] Task "${task.title}" updated, interval=${task.reminderIntervalMinutes}min');
+    debugPrint(
+        '[Twince-Reminder] Task "${task.title}" updated, interval=${task.reminderIntervalMinutes}min');
   }
 
   void dispose() {

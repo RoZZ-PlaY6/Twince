@@ -30,7 +30,8 @@ class _ExportBackupButtonState extends State<ExportBackupButton> {
         ExportStatus.unavailable =>
           'اشتراک‌گذاری فایل در این پلتفرم در دسترس نیست.',
       };
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -56,7 +57,8 @@ class _ExportBackupButtonState extends State<ExportBackupButton> {
         ImportStatus.noData => 'داده‌ای در فایل یافت نشد.',
         ImportStatus.unavailable => 'انتخاب فایل در این پلتفرم در دسترس نیست.',
       };
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

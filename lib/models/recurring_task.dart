@@ -22,6 +22,10 @@ class RecurringTask {
     this.notificationSoundId = 'cyber_pulse',
     this.customSystemSoundUri,
     this.notificationTimerOptions = const {},
+    this.isAlarm = false,
+    this.alarmSoundType = AlarmSoundType.system,
+    this.alarmSoundId = 'cyber_pulse',
+    this.alarmSoundUri,
   })  : id = id ?? const Uuid().v4(),
         title = title.trim(),
         weekdays = List.unmodifiable(weekdays.toSet().toList()..sort()),
@@ -68,6 +72,10 @@ class RecurringTask {
 
   /// Selected notification timer options for this task.
   final Set<NotificationTimerOption> notificationTimerOptions;
+  final bool isAlarm;
+  final AlarmSoundType alarmSoundType;
+  final String alarmSoundId;
+  final String? alarmSoundUri;
 
   RecurringTask copyWithGeneratedThrough(DateTime date) => RecurringTask(
         id: id,
@@ -86,6 +94,10 @@ class RecurringTask {
         notificationSoundId: notificationSoundId,
         customSystemSoundUri: customSystemSoundUri,
         notificationTimerOptions: notificationTimerOptions,
+        isAlarm: isAlarm,
+        alarmSoundType: alarmSoundType,
+        alarmSoundId: alarmSoundId,
+        alarmSoundUri: alarmSoundUri,
       );
 
   Task occurrenceOn(DateTime date) {
@@ -105,7 +117,8 @@ class RecurringTask {
         );
     final start = at(startTime);
     final end = at(endTime);
-    final endAdjusted = end.isAfter(start) ? end : end.add(const Duration(days: 1));
+    final endAdjusted =
+        end.isAfter(start) ? end : end.add(const Duration(days: 1));
     return Task(
       title: title,
       description: description,
@@ -120,6 +133,10 @@ class RecurringTask {
       notificationSoundId: notificationSoundId,
       customSystemSoundUri: customSystemSoundUri,
       notificationTimerOptions: notificationTimerOptions,
+      isAlarm: isAlarm,
+      alarmSoundType: alarmSoundType,
+      alarmSoundId: alarmSoundId,
+      alarmSoundUri: alarmSoundUri,
     );
   }
 }
@@ -140,7 +157,8 @@ class RecurringTaskAdapter extends TypeAdapter<RecurringTask> {
     final categoryValue = fields[3];
     TaskCategory category;
     if (categoryValue is int) {
-      category = TaskCategory.values[categoryValue.clamp(0, TaskCategory.values.length - 1)];
+      category = TaskCategory
+          .values[categoryValue.clamp(0, TaskCategory.values.length - 1)];
     } else if (categoryValue is String) {
       category = TaskCategoryX.fromString(categoryValue);
     } else {
@@ -151,6 +169,7 @@ class RecurringTaskAdapter extends TypeAdapter<RecurringTask> {
     final notificationSoundId = fields[13] as String? ?? 'cyber_pulse';
     final customSystemSoundUri = fields[14] as String?;
     final notificationTimerOptions = fields[15] as List?;
+    final alarmSoundTypeIndex = fields[17] as int? ?? 0;
     return RecurringTask(
       id: fields[0] as String,
       title: fields[1] as String,
@@ -172,13 +191,18 @@ class RecurringTaskAdapter extends TypeAdapter<RecurringTask> {
               .map((e) => NotificationTimerOption.values[e as int])
               .toSet()
           : const {},
+      isAlarm: fields[16] as bool? ?? false,
+      alarmSoundType: AlarmSoundType.values[
+          alarmSoundTypeIndex.clamp(0, AlarmSoundType.values.length - 1)],
+      alarmSoundId: fields[18] as String? ?? 'cyber_pulse',
+      alarmSoundUri: fields[19] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, RecurringTask task) {
     writer
-      ..writeByte(16) // Updated field count
+      ..writeByte(20)
       ..writeByte(0)
       ..write(task.id)
       ..writeByte(1)
@@ -210,6 +234,14 @@ class RecurringTaskAdapter extends TypeAdapter<RecurringTask> {
       ..writeByte(14)
       ..write(task.customSystemSoundUri)
       ..writeByte(15)
-      ..write(task.notificationTimerOptions.map((e) => e.index).toList());
+      ..write(task.notificationTimerOptions.map((e) => e.index).toList())
+      ..writeByte(16)
+      ..write(task.isAlarm)
+      ..writeByte(17)
+      ..write(task.alarmSoundType.index)
+      ..writeByte(18)
+      ..write(task.alarmSoundId)
+      ..writeByte(19)
+      ..write(task.alarmSoundUri);
   }
 }

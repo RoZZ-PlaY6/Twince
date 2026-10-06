@@ -43,8 +43,10 @@ class AppTheme {
         toolbarTextStyle: baseTextTheme.bodyMedium,
       ),
       tabBarTheme: TabBarThemeData(
-        labelStyle: baseTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
-        unselectedLabelStyle: baseTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w400),
+        labelStyle:
+            baseTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+        unselectedLabelStyle:
+            baseTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w400),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -63,39 +65,49 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          textStyle: baseTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+          textStyle:
+              baseTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          textStyle: baseTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+          textStyle:
+              baseTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          textStyle: baseTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w500),
+          textStyle:
+              baseTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w500),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          textStyle: baseTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w500),
+          textStyle:
+              baseTextTheme.labelLarge?.copyWith(fontWeight: FontWeight.w500),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
       chipTheme: ChipThemeData(
-        labelStyle: baseTextTheme.labelMedium?.copyWith(fontWeight: FontWeight.w500),
+        labelStyle:
+            baseTextTheme.labelMedium?.copyWith(fontWeight: FontWeight.w500),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       dialogTheme: DialogThemeData(
-        titleTextStyle: baseTextTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+        titleTextStyle:
+            baseTextTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
         contentTextStyle: baseTextTheme.bodyMedium,
       ),
     );
@@ -105,8 +117,6 @@ class AppTheme {
         color: surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: accent.withOpacity(0.7)),
-        boxShadow: [
-          BoxShadow(color: accent.withOpacity(0.14), blurRadius: 16)
-        ],
+        boxShadow: [BoxShadow(color: accent.withOpacity(0.14), blurRadius: 16)],
       );
 }

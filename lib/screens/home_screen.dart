@@ -14,8 +14,26 @@ import 'add_task_bottom_sheet.dart';
 import 'analytics_screen.dart';
 import 'history_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+@visibleForTesting
+List<Task> activeAlarmedTasks(List<Task> tasks, {DateTime? now}) {
+  final current = now ?? DateTime.now();
+  return tasks
+      .where((task) =>
+          task.status == TaskStatus.pending &&
+          task.isAlarm &&
+          task.startTime.isAfter(current))
+      .toList();
+}
+
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _destination = 0;
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
@@ -59,24 +77,33 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
             ],
-            bottom: const TabBar(
-              tabs: [
-                Tab(text: 'Active'),
-                Tab(text: 'Completed'),
-                Tab(text: 'Failed'),
-              ],
-            ),
+            bottom: _destination == 0
+                ? const TabBar(
+                    tabs: [
+                      Tab(text: 'Active'),
+                      Tab(text: 'Completed'),
+                      Tab(text: 'Failed'),
+                    ],
+                  )
+                : null,
           ),
           body: Consumer<StorageService>(
             builder: (context, storage, _) {
               final tasks = storage.getAllTasks();
-              return TabBarView(
-                children: [
-                  _taskList(context, storage, tasks, TaskStatus.pending),
-                  _taskList(context, storage, tasks, TaskStatus.completed),
-                  _taskList(context, storage, tasks, TaskStatus.failed),
-                ],
-              );
+              if (_destination == 1) {
+                return _taskList(
+                  context,
+                  storage,
+                  tasks,
+                  TaskStatus.pending,
+                  alarmOnly: true,
+                );
+              }
+              return TabBarView(children: [
+                _taskList(context, storage, tasks, TaskStatus.pending),
+                _taskList(context, storage, tasks, TaskStatus.completed),
+                _taskList(context, storage, tasks, TaskStatus.failed),
+              ]);
             },
           ),
           floatingActionButton: FloatingActionButton.extended(
@@ -84,30 +111,50 @@ class HomeScreen extends StatelessWidget {
               context: context,
               isScrollControlled: true,
               showDragHandle: true,
-              builder: (_) =>
-                  AddTaskBottomSheet(storage: context.read<StorageService>()),
+              builder: (_) => AddTaskBottomSheet(
+                storage: context.read<StorageService>(),
+                initialAlarmEnabled: _destination == 1,
+              ),
             ),
             icon: const Icon(Icons.add),
             label: const Text('Add task'),
           ),
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: _destination,
+            onDestinationSelected: (index) =>
+                setState(() => _destination = index),
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.task_alt_outlined),
+                selectedIcon: Icon(Icons.task_alt),
+                label: 'Tasks',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.alarm_outlined),
+                selectedIcon: Icon(Icons.alarm),
+                label: 'Alarmed Tasks',
+              ),
+            ],
+          ),
         ),
       );
 
-  Widget _taskList(
-    BuildContext context,
-    StorageService storage,
-    List<Task> tasks,
-    TaskStatus status,
-  ) {
-    final filtered = tasks.where((task) => task.status == status).toList();
+  Widget _taskList(BuildContext context, StorageService storage,
+      List<Task> tasks, TaskStatus status,
+      {bool alarmOnly = false}) {
+    final filtered = alarmOnly
+        ? activeAlarmedTasks(tasks)
+        : tasks.where((task) => task.status == status).toList();
     if (filtered.isEmpty) {
       return Center(
         child: Text(
-          status == TaskStatus.pending
-              ? 'No active tasks yet'
-              : status == TaskStatus.completed
-                  ? 'Nothing completed yet'
-                  : 'No failed tasks',
+          alarmOnly
+              ? 'No active alarmed tasks'
+              : status == TaskStatus.pending
+                  ? 'No active tasks yet'
+                  : status == TaskStatus.completed
+                      ? 'Nothing completed yet'
+                      : 'No failed tasks',
           style: const TextStyle(color: Colors.white54),
         ),
       );

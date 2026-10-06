@@ -66,11 +66,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final filtered = tasks.where((task) {
       final date = _normalizeDate(task.targetDate);
       return date.isAfter(start.subtract(const Duration(days: 1))) &&
-             date.isBefore(end.add(const Duration(days: 1))) &&
-             (task.status == TaskStatus.completed || task.status == TaskStatus.failed);
+          date.isBefore(end.add(const Duration(days: 1))) &&
+          (task.status == TaskStatus.completed ||
+              task.status == TaskStatus.failed);
     }).toList();
 
-    final completed = filtered.where((t) => t.status == TaskStatus.completed).length;
+    final completed =
+        filtered.where((t) => t.status == TaskStatus.completed).length;
     final failed = filtered.where((t) => t.status == TaskStatus.failed).length;
     final total = completed + failed;
     final rate = total > 0 ? (completed / total * 100) : 0.0;
@@ -87,16 +89,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final (start, end) = _getDateRange(_mode, _selectedDate);
     final days = <_DaySummary>[];
 
-    for (var date = start; date.isBefore(end.add(const Duration(days: 1))); date = date.add(const Duration(days: 1))) {
-      final dayTasks = tasks.where((task) =>
-          _normalizeDate(task.targetDate).year == date.year &&
-          _normalizeDate(task.targetDate).month == date.month &&
-          _normalizeDate(task.targetDate).day == date.day &&
-          (task.status == TaskStatus.completed || task.status == TaskStatus.failed)
-      ).toList();
+    for (var date = start;
+        date.isBefore(end.add(const Duration(days: 1)));
+        date = date.add(const Duration(days: 1))) {
+      final dayTasks = tasks
+          .where((task) =>
+              _normalizeDate(task.targetDate).year == date.year &&
+              _normalizeDate(task.targetDate).month == date.month &&
+              _normalizeDate(task.targetDate).day == date.day &&
+              (task.status == TaskStatus.completed ||
+                  task.status == TaskStatus.failed))
+          .toList();
 
-      final completed = dayTasks.where((t) => t.status == TaskStatus.completed).length;
-      final failed = dayTasks.where((t) => t.status == TaskStatus.failed).length;
+      final completed =
+          dayTasks.where((t) => t.status == TaskStatus.completed).length;
+      final failed =
+          dayTasks.where((t) => t.status == TaskStatus.failed).length;
 
       if (completed > 0 || failed > 0) {
         days.add(_DaySummary(
@@ -117,7 +125,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final weekday = date.weekday; // 1 = Monday
       final start = date.subtract(Duration(days: weekday - 1));
       final end = start.add(const Duration(days: 6));
-      return (DateTime(start.year, start.month, start.day), DateTime(end.year, end.month, end.day));
+      return (
+        DateTime(start.year, start.month, start.day),
+        DateTime(end.year, end.month, end.day)
+      );
     } else {
       final start = DateTime(date.year, date.month, 1);
       final end = DateTime(date.year, date.month + 1, 0);
@@ -125,9 +136,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
   }
 
-  DateTime _normalizeDate(DateTime date) => DateTime(date.year, date.month, date.day);
+  DateTime _normalizeDate(DateTime date) =>
+      DateTime(date.year, date.month, date.day);
 
-   Future<void> _pickDate() async {
+  Future<void> _pickDate() async {
     final now = DateTime.now();
     final initial = _selectedDate;
     DateTime? picked;
@@ -155,7 +167,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       setState(() => _selectedDate = nonNullDate);
     }
   }
-
 
   void _changeDate(int delta) {
     setState(() {
@@ -189,8 +200,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               icon: Icon(_mode == _AnalyticsViewMode.weekly
                   ? Icons.calendar_month
                   : Icons.calendar_view_week),
-              onPressed: () => setState(() =>
-                  _mode = _mode == _AnalyticsViewMode.weekly
+              onPressed: () => setState(() => _mode =
+                  _mode == _AnalyticsViewMode.weekly
                       ? _AnalyticsViewMode.monthly
                       : _AnalyticsViewMode.weekly),
             ),
@@ -203,7 +214,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               decoration: BoxDecoration(
                 color: AppTheme.surface,
-                border: Border(bottom: BorderSide(color: AppTheme.purple.withOpacity(0.3))),
+                border: Border(
+                    bottom:
+                        BorderSide(color: AppTheme.purple.withOpacity(0.3))),
               ),
               child: Column(
                 children: [
@@ -213,13 +226,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       _ViewModeButton(
                         label: 'Weekly',
                         selected: _mode == _AnalyticsViewMode.weekly,
-                        onTap: () => setState(() => _mode = _AnalyticsViewMode.weekly),
+                        onTap: () =>
+                            setState(() => _mode = _AnalyticsViewMode.weekly),
                       ),
                       const SizedBox(width: 8),
                       _ViewModeButton(
                         label: 'Monthly',
                         selected: _mode == _AnalyticsViewMode.monthly,
-                        onTap: () => setState(() => _mode = _AnalyticsViewMode.monthly),
+                        onTap: () =>
+                            setState(() => _mode = _AnalyticsViewMode.monthly),
                       ),
                     ],
                   ),
@@ -229,29 +244,33 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     children: [
                       IconButton(
                         tooltip: 'Previous',
-                        icon: const Icon(Icons.chevron_left, color: AppTheme.cyan),
+                        icon: const Icon(Icons.chevron_left,
+                            color: AppTheme.cyan),
                         onPressed: () => _changeDate(-1),
                       ),
                       Expanded(
                         child: Text(
                           _getRangeLabel(),
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppTheme.cyan,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color: AppTheme.cyan,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                         ),
                       ),
                       IconButton(
                         tooltip: 'Next',
-                        icon: const Icon(Icons.chevron_right, color: AppTheme.cyan),
+                        icon: const Icon(Icons.chevron_right,
+                            color: AppTheme.cyan),
                         onPressed: () => _changeDate(1),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
-                    icon: const Icon(Icons.calendar_month, color: AppTheme.cyan, size: 18),
+                    icon: const Icon(Icons.calendar_month,
+                        color: AppTheme.cyan, size: 18),
                     label: const Text('Pick date'),
                     onPressed: _pickDate,
                   ),
@@ -271,11 +290,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 child: _daySummaries.isEmpty
                     ? Center(
                         child: Text(
-                          _mode == _AnalyticsViewMode.weekly
-                              ? 'No completed/failed tasks this week'
-                              : 'No completed/failed tasks this month',
-                          style: const TextStyle(color: Colors.white54),
-                        ))
+                        _mode == _AnalyticsViewMode.weekly
+                            ? 'No completed/failed tasks this week'
+                            : 'No completed/failed tasks this month',
+                        style: const TextStyle(color: Colors.white54),
+                      ))
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                         itemCount: _daySummaries.length,
@@ -308,10 +327,12 @@ class _ViewModeButton extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
-              color: selected ? AppTheme.cyan.withOpacity(0.2) : AppTheme.surface,
+              color:
+                  selected ? AppTheme.cyan.withOpacity(0.2) : AppTheme.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: selected ? AppTheme.cyan : AppTheme.purple.withOpacity(0.5),
+                color:
+                    selected ? AppTheme.cyan : AppTheme.purple.withOpacity(0.5),
               ),
             ),
             child: Text(
@@ -412,9 +433,9 @@ class _MetricCard extends StatelessWidget {
               Text(
                 value,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                ),
+                      color: color,
+                      fontWeight: FontWeight.w700,
+                    ),
               ),
               Text(
                 label,
@@ -458,7 +479,9 @@ class _DaySummaryTileState extends State<_DaySummaryTile> {
   @override
   Widget build(BuildContext context) {
     final summary = widget.summary;
-    final color = summary.completed > summary.failed ? AppTheme.completed : AppTheme.failed;
+    final color = summary.completed > summary.failed
+        ? AppTheme.completed
+        : AppTheme.failed;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -478,13 +501,15 @@ class _DaySummaryTileState extends State<_DaySummaryTile> {
                       children: [
                         Text(
                           DateFormat.EEEE().format(summary.date),
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                         ),
                         Text(
                           DateFormat.yMMMd().format(summary.date),
-                          style: const TextStyle(color: Colors.white60, fontSize: 12),
+                          style: const TextStyle(
+                              color: Colors.white60, fontSize: 12),
                         ),
                       ],
                     ),
@@ -565,9 +590,10 @@ class _DayTaskTile extends StatelessWidget {
                 Text(
                   task.title,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w500,
-                    decoration: !isCompleted ? TextDecoration.lineThrough : null,
-                  ),
+                        fontWeight: FontWeight.w500,
+                        decoration:
+                            !isCompleted ? TextDecoration.lineThrough : null,
+                      ),
                 ),
                 if (task.description.isNotEmpty) ...[
                   const SizedBox(height: 2),
@@ -599,7 +625,8 @@ class _DayTaskTile extends StatelessWidget {
                       ),
                     if (task.completedAt != null)
                       _TagChip(
-                        label: 'Done: ${DateFormat('HH:mm:ss').format(task.completedAt!)}',
+                        label:
+                            'Done: ${DateFormat('HH:mm:ss').format(task.completedAt!)}',
                         color: AppTheme.completed,
                       ),
                   ],

@@ -70,7 +70,8 @@ class RecurringTaskGroup {
   int get totalOccurrences => occurrences.length;
 
   /// Number of completed occurrences
-  int get completedCount => occurrences.where((t) => t.status.index == 2).length;
+  int get completedCount =>
+      occurrences.where((t) => t.status.index == 2).length;
 
   /// Number of pending occurrences
   int get pendingCount => occurrences.where((t) => t.status.index == 1).length;
@@ -79,30 +80,30 @@ class RecurringTaskGroup {
   int get failedCount => occurrences.where((t) => t.status.index == 3).length;
 
   /// Whether all occurrences are completed
-  bool get isFullyCompleted => occurrences.isNotEmpty && 
-      occurrences.every((t) => t.status.index == 2);
+  bool get isFullyCompleted =>
+      occurrences.isNotEmpty && occurrences.every((t) => t.status.index == 2);
 
   /// Whether all occurrences are failed
-  bool get allFailed => occurrences.isNotEmpty && 
-      occurrences.every((t) => t.status.index == 3);
+  bool get allFailed =>
+      occurrences.isNotEmpty && occurrences.every((t) => t.status.index == 3);
 
   /// Whether any occurrence is currently active
   bool get hasActiveOccurrence {
-    return occurrences.any((t) => 
-      t.status.index == 1 && // pending
-      t.isTimeBound &&
-      !DateTime.now().isBefore(t.startTime) &&
-      DateTime.now().isBefore(t.endTime));
+    return occurrences.any((t) =>
+        t.status.index == 1 && // pending
+        t.isTimeBound &&
+        !DateTime.now().isBefore(t.startTime) &&
+        DateTime.now().isBefore(t.endTime));
   }
 
   /// Whether any occurrence is currently active and in progress
   bool get hasActiveInProgress {
     final now = DateTime.now();
-    return occurrences.any((t) => 
-      t.status.index == 1 && // pending
-      t.isTimeBound &&
-      !now.isBefore(t.startTime) &&
-      now.isBefore(t.endTime));
+    return occurrences.any((t) =>
+        t.status.index == 1 && // pending
+        t.isTimeBound &&
+        !now.isBefore(t.startTime) &&
+        now.isBefore(t.endTime));
   }
 
   /// Get the next upcoming occurrence

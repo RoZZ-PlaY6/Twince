@@ -32,6 +32,10 @@ void main() {
         reminderIntervalMinutes: 30,
         createdAt: start.subtract(const Duration(days: 1)),
         customNotificationMessage: 'Custom reminder message',
+        isAlarm: true,
+        alarmSoundType: AlarmSoundType.customFile,
+        alarmSoundId: 'picked.mp3',
+        alarmSoundUri: 'content://audio/picked',
       );
       await box.put(task.id, task.copyWith(status: TaskStatus.failed));
       await box.close();
@@ -48,6 +52,10 @@ void main() {
       expect(restored.reminderIntervalMinutes, 30);
       expect(restored.completedAt, isNull);
       expect(restored.customNotificationMessage, 'Custom reminder message');
+      expect(restored.isAlarm, isTrue);
+      expect(restored.alarmSoundType, AlarmSoundType.customFile);
+      expect(restored.alarmSoundId, 'picked.mp3');
+      expect(restored.alarmSoundUri, 'content://audio/picked');
       await box.close();
     } finally {
       await directory.delete(recursive: true);
@@ -75,6 +83,8 @@ void main() {
       final restored = box.get('known-id-2')!;
       expect(restored.customNotificationMessage, isNull);
       expect(restored.hasCustomNotificationMessage, isFalse);
+      expect(restored.isAlarm, isFalse);
+      expect(restored.alarmSoundType, AlarmSoundType.system);
       await box.close();
     } finally {
       await directory.delete(recursive: true);
@@ -89,17 +99,19 @@ void main() {
       endTime: DateTime(2026, 10, 5, 11),
       customNotificationMessage: 'Original message',
     );
-    
+
     // Test updating message
     var updated = task.copyWith(customNotificationMessage: 'Updated message');
     expect(updated.customNotificationMessage, 'Updated message');
-    
+
     // Test clearing message
-    updated = task.copyWith(customNotificationMessage: '', clearCustomNotificationMessage: true);
+    updated = task.copyWith(
+        customNotificationMessage: '', clearCustomNotificationMessage: true);
     expect(updated.customNotificationMessage, isNull);
-    
+
     // Test whitespace-only clears
-    updated = task.copyWith(customNotificationMessage: '   ', clearCustomNotificationMessage: true);
+    updated = task.copyWith(
+        customNotificationMessage: '   ', clearCustomNotificationMessage: true);
     expect(updated.customNotificationMessage, isNull);
   });
 
@@ -119,6 +131,9 @@ void main() {
         startTime: DateTime(2026, 10, 5, 7, 30, 5),
         endTime: DateTime(2026, 10, 5, 8, 30, 5),
         customNotificationMessage: 'Recurring custom message',
+        isAlarm: true,
+        alarmSoundType: AlarmSoundType.builtIn,
+        alarmSoundId: 'gentle_bell',
       );
       final first = definition.occurrenceOn(monday);
       final second = definition.occurrenceOn(DateTime(2026, 10, 7));
@@ -139,8 +154,13 @@ void main() {
       expect(tasks.get(first.id)!.recurringDefinitionId, definition.id);
       expect(definitions.get(definition.id)!.title, 'Exercise');
       expect(definitions.get(definition.id)!.weekdays, [1, 3]);
-      expect(definitions.get(definition.id)!.customNotificationMessage, 'Recurring custom message');
-      expect(tasks.get(first.id)!.customNotificationMessage, 'Recurring custom message');
+      expect(definitions.get(definition.id)!.customNotificationMessage,
+          'Recurring custom message');
+      expect(tasks.get(first.id)!.customNotificationMessage,
+          'Recurring custom message');
+      expect(definitions.get(definition.id)!.isAlarm, isTrue);
+      expect(tasks.get(second.id)!.isAlarm, isTrue);
+      expect(tasks.get(second.id)!.alarmSoundId, 'gentle_bell');
       await tasks.close();
       await definitions.close();
     } finally {
