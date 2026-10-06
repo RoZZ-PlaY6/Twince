@@ -19,9 +19,8 @@ typedef ResolvedTaskSchedule = ({
 
 /// Combines clock-only selections with the task's calendar date in local time.
 ///
-/// For an alarm scheduled today, a time that has already passed rolls to
-/// tomorrow. A selection within the current minute gets a short lead instead,
-/// avoiding failures caused only by picker/save latency and second precision.
+/// A completed window scheduled for today rolls to tomorrow. The end-time
+/// comparison includes a short grace period for picker/save latency.
 @visibleForTesting
 ResolvedTaskSchedule resolveTaskSchedule({
   required DateTime selectedDate,
@@ -29,12 +28,13 @@ ResolvedTaskSchedule resolveTaskSchedule({
   required DateTime selectedEndTime,
   required DateTime now,
   required bool adjustPassedAlarm,
-  Duration currentMinuteTolerance = const Duration(minutes: 1),
+  Duration alarmGracePeriod = const Duration(seconds: 30),
 }) {
   final localNow = now.toLocal();
   var taskDay =
       DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
   final today = DateTime(localNow.year, localNow.month, localNow.day);
+  if (adjustPassedAlarm && taskDay.isBefore(today)) taskDay = today;
 
   DateTime combine(DateTime day, DateTime clock) => DateTime(
         day.year,
@@ -46,20 +46,16 @@ ResolvedTaskSchedule resolveTaskSchedule({
       );
 
   var start = combine(taskDay, selectedStartTime);
-  if (adjustPassedAlarm && taskDay == today && !start.isAfter(localNow)) {
-    final elapsed = localNow.difference(start);
-    if (elapsed < currentMinuteTolerance) {
-      start = localNow.add(const Duration(seconds: 2));
-    } else {
-      taskDay = taskDay.add(const Duration(days: 1));
-      start = combine(taskDay, selectedStartTime);
-    }
-  }
-
-  // A tolerance adjustment at 23:59 can cross midnight.
-  taskDay = DateTime(start.year, start.month, start.day);
   var end = combine(taskDay, selectedEndTime);
   if (!end.isAfter(start)) end = end.add(const Duration(days: 1));
+  if (adjustPassedAlarm &&
+      taskDay == today &&
+      end.isBefore(localNow.subtract(alarmGracePeriod))) {
+    taskDay = taskDay.add(const Duration(days: 1));
+    start = combine(taskDay, selectedStartTime);
+    end = combine(taskDay, selectedEndTime);
+    if (!end.isAfter(start)) end = end.add(const Duration(days: 1));
+  }
 
   return (targetDate: taskDay, startTime: start, endTime: end);
 }
@@ -302,7 +298,8 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
       );
       return;
     }
-    if (_isAlarm && !schedule.startTime.isAfter(now)) {
+    if (_isAlarm &&
+        schedule.endTime.isBefore(now.subtract(const Duration(seconds: 30)))) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Alarm time must be in the future.')),
       );
