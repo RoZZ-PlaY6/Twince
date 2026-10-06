@@ -57,25 +57,13 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
     _customSystemSoundUri = task.customSystemSoundUri;
     _notificationTimerOptions = task.notificationTimerOptions;
 
-    // If this task was generated from a recurring definition, load the recurring definition
+    // An occurrence opens in single-task edit mode. Editing the series is explicit.
     if (task.recurringDefinitionId != null) {
-      _loadRecurringDefinition(task.recurringDefinitionId!);
-    }
-  }
-
-  Future<void> _loadRecurringDefinition(String recurringId) async {
-    try {
-      final recurringTask = widget.storage.getRecurringTaskById(recurringId);
-      if (recurringTask != null) {
-        setState(() {
-          _editingRecurringTask = recurringTask;
-          _recurring = true;
-          _weekdays.clear();
-          _weekdays.addAll(recurringTask.weekdays);
-        });
+      _editingRecurringTask =
+          widget.storage.getRecurringTaskById(task.recurringDefinitionId!);
+      if (_editingRecurringTask != null) {
+        _weekdays.addAll(_editingRecurringTask!.weekdays);
       }
-    } catch (e) {
-      debugPrint('Could not load recurring definition: $e');
     }
   }
 
@@ -102,7 +90,7 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
     if (widget.task == null) {
       return _recurring ? 'Create recurring task' : 'Create task';
     }
-    if (_editingRecurringTask != null) return 'Update recurring task';
+    if (_editingRecurringTask != null && _recurring) return 'Update recurring task';
     if (_recurring) return 'Update recurring task';
     return 'Save changes';
   }
@@ -384,10 +372,15 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
                   ),
                   const SizedBox(height: 12),
                   SwitchListTile(
-                    title: const Text('Recurring task'),
-                    subtitle: const Text('Repeat on selected weekdays'),
+                    title: Text(_editingRecurringTask == null
+                        ? 'Recurring task'
+                        : 'Edit recurring series'),
+                    subtitle: Text(_editingRecurringTask == null
+                        ? 'Repeat on selected weekdays'
+                        : 'Changes to the series affect its future occurrences'),
                     value: _recurring,
-                    onChanged: _retrying
+                    onChanged: _retrying ||
+                            (widget.task != null && _editingRecurringTask == null)
                         ? null
                         : (value) => setState(() {
                             _recurring = value;
