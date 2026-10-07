@@ -103,6 +103,38 @@ void main() {
     );
   });
 
+  test('Android exact alarm uses the task end time', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    const channel = MethodChannel('twince/alarms');
+    MethodCall? captured;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      captured = call;
+      return true;
+    });
+    addTearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    final now = DateTime.now();
+    final task = Task(
+      title: 'Timed task',
+      targetDate: DateTime(now.year, now.month, now.day),
+      startTime: now.add(const Duration(minutes: 1)),
+      endTime: now.add(const Duration(hours: 1)),
+      isAlarm: true,
+    );
+    await AlarmService.instance.schedule(task);
+
+    expect(captured?.method, 'schedule');
+    expect(
+      (captured?.arguments as Map<Object?, Object?>)['triggerAtMillis'],
+      task.endTime.millisecondsSinceEpoch,
+    );
+  });
+
   test('alarmed task filter keeps only pending alarms that have not ended', () {
     final now = DateTime(2026, 10, 6, 12);
     Task task(String title,
