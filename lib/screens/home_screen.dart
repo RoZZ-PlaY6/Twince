@@ -21,9 +21,13 @@ List<Task> activeAlarmedTasks(List<Task> tasks, {DateTime? now}) {
       .where((task) =>
           task.status == TaskStatus.pending &&
           task.isAlarm &&
-          task.startTime.isAfter(current))
+          task.endTime.isAfter(current))
       .toList();
 }
+
+@visibleForTesting
+List<Task> standardTasksByStatus(List<Task> tasks, TaskStatus status) =>
+    tasks.where((task) => task.status == status && !task.isAlarm).toList();
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -144,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
       {bool alarmOnly = false}) {
     final filtered = alarmOnly
         ? activeAlarmedTasks(tasks)
-        : tasks.where((task) => task.status == status).toList();
+        : standardTasksByStatus(tasks, status);
     if (filtered.isEmpty) {
       return Center(
         child: Text(

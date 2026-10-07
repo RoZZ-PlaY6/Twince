@@ -183,7 +183,7 @@ class StorageService extends ChangeNotifier {
     }
     if (task.isAlarm &&
         task.status == TaskStatus.pending &&
-        task.startTime.isAfter(DateTime.now())) {
+        task.endTime.toLocal().isAfter(DateTime.now().toLocal())) {
       await _alarms?.schedule(task);
     } else {
       await _alarms?.cancel(task.id);
