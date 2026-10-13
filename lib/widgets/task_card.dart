@@ -114,112 +114,152 @@ class _TaskCardState extends State<TaskCard> {
         ? (elapsedDuration / totalDuration).clamp(0.0, 1.0)
         : 0.0;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: AppTheme.neonCard(accent: accent),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xC4102139),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: accent.withValues(alpha: 0.9),
+          width: 1.15,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.28),
+            blurRadius: 18,
+          ),
+          BoxShadow(
+            color: AppTheme.purple.withValues(alpha: 0.14),
+            blurRadius: 28,
+            offset: const Offset(8, 10),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
         children: [
-          if (failed)
-            const Padding(
-              padding: EdgeInsets.only(top: 9, right: 12),
-              child: Icon(Icons.close_rounded, color: AppTheme.failed),
-            )
-          else
-            Checkbox(
-              value: complete,
-              onChanged: (_) => widget.onToggle(),
-              activeColor: AppTheme.completed,
-              side: const BorderSide(color: AppTheme.cyan),
-            ),
-          Expanded(
-            child: Column(
+          Padding(
+            padding: EdgeInsets.fromLTRB(12, 12, 8, active ? 22 : 12),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  task.title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        decoration: failed ? TextDecoration.lineThrough : null,
-                        color: failed ? Colors.white54 : null,
-                      ),
-                ),
-                if (task.description.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    task.description,
-                    style: TextStyle(
-                      color: failed ? Colors.white38 : Colors.white70,
-                    ),
+                if (failed)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 9, right: 12),
+                    child: Icon(Icons.close_rounded, color: AppTheme.failed),
+                  )
+                else
+                  Checkbox(
+                    value: complete,
+                    onChanged: (_) => widget.onToggle(),
+                    activeColor: AppTheme.completed,
+                    side: const BorderSide(color: AppTheme.cyan, width: 1.5),
                   ),
-                ],
-                const SizedBox(height: 9),
-                Wrap(
-                  spacing: 7,
-                  runSpacing: 7,
-                  children: [
-                    _badge(task.category.label, AppTheme.purple),
-                    if (failed) _badge('FAILED', AppTheme.failed),
-                    if (complete) _badge('DONE', AppTheme.completed),
-                    if (task.isTimeBound) _badge(window, AppTheme.cyan),
-                    if (task.isTimeBound && !failed && !complete)
-                      _badge(
-                          countdown,
-                          now.isBefore(task.endTime)
-                              ? AppTheme.blue
-                              : AppTheme.failed),
-                  ],
-                ),
-                if (active) ...[
-                  const SizedBox(height: 14),
-                  LayoutBuilder(
-                    builder: (context, constraints) => Container(
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: AppTheme.background,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.cyan.withOpacity(0.35),
-                            blurRadius: 12,
-                          )
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        task.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(
+                              decoration:
+                                  failed ? TextDecoration.lineThrough : null,
+                              color: failed ? Colors.white54 : Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      if (task.description.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          task.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: failed ? Colors.white38 : Colors.white70,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 9),
+                      Wrap(
+                        spacing: 7,
+                        runSpacing: 7,
+                        children: [
+                          _badge(task.category.label, AppTheme.purple),
+                          if (failed) _badge('FAILED', AppTheme.failed),
+                          if (complete) _badge('DONE', AppTheme.completed),
+                          if (task.isTimeBound) _badge(window, AppTheme.cyan),
+                          if (task.isTimeBound && !failed && !complete)
+                            _badge(
+                                countdown,
+                                now.isBefore(task.endTime)
+                                    ? AppTheme.blue
+                                    : AppTheme.failed),
                         ],
                       ),
-                      clipBehavior: Clip.antiAlias,
-                      alignment: Alignment.centerLeft,
-                      child: AnimatedContainer(
-                        key: const ValueKey('task-progress-fill'),
-                        duration: const Duration(seconds: 1),
-                        curve: Curves.linear,
-                        width: constraints.maxWidth * progress,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                              colors: [AppTheme.cyan, AppTheme.purple]),
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
+                Column(
+                  children: [
+                    if (!complete)
+                      IconButton(
+                        tooltip: failed ? 'Retry / Reschedule' : 'Edit task',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: widget.onEdit,
+                        icon: Icon(
+                            failed ? Icons.replay_rounded : Icons.edit_outlined,
+                            color: failed ? AppTheme.purple : AppTheme.cyan),
+                      ),
+                    IconButton(
+                      tooltip: 'Delete task',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: widget.onDelete,
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-          Column(
-            children: [
-              if (!complete)
-                IconButton(
-                  tooltip: failed ? 'Retry / Reschedule' : 'Edit task',
-                  onPressed: widget.onEdit,
-                  icon: Icon(
-                      failed ? Icons.replay_rounded : Icons.edit_outlined,
-                      color: failed ? AppTheme.purple : AppTheme.cyan),
+          if (active)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: LayoutBuilder(
+                builder: (context, constraints) => Container(
+                  height: 6,
+                  color: const Color(0xAA030A19),
+                  alignment: Alignment.centerLeft,
+                  child: AnimatedContainer(
+                    key: const ValueKey('task-progress-fill'),
+                    duration: const Duration(seconds: 1),
+                    curve: Curves.linear,
+                    width: constraints.maxWidth * progress,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [
+                          AppTheme.cyan,
+                          AppTheme.blue,
+                          AppTheme.purple,
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.cyan.withValues(alpha: 0.65),
+                          blurRadius: 10,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              IconButton(
-                tooltip: 'Delete task',
-                onPressed: widget.onDelete,
-                icon: const Icon(Icons.delete_outline),
               ),
-            ],
-          ),
+            ),
         ],
       ),
     );
@@ -228,11 +268,24 @@ class _TaskCardState extends State<TaskCard> {
   Widget _badge(String text, Color color) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
-          border: Border.all(color: color.withOpacity(0.6)),
+          color: color.withValues(alpha: 0.14),
+          border: Border.all(color: color.withValues(alpha: 0.58)),
           borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.08),
+              blurRadius: 8,
+            ),
+          ],
         ),
-        child: Text(text, style: TextStyle(color: color, fontSize: 11)),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: color,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       );
 
   String _duration(Duration duration) {

@@ -92,8 +92,8 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
         Text(
           widget.label,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: Colors.white70,
-                fontWeight: FontWeight.w500,
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
               ),
         ),
         const SizedBox(height: 8),
@@ -109,27 +109,40 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
             initialValue: effectiveSoundId,
             validator: widget.validator,
             builder: (field) => Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Dropdown with sound selection
                 DropdownButtonFormField<String>(
-                  value: effectiveSoundId,
+                  itemHeight: null,
+                  isDense: false,
+                  key: ValueKey(
+                      '$effectiveSoundId-${widget.customSystemSoundUri ?? ''}'),
+                  initialValue: effectiveSoundId,
                   decoration: InputDecoration(
                     hintText: widget.hintText,
                     filled: true,
-                    fillColor: AppTheme.surface,
+                    fillColor: const Color(0xA814264B),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide.none,
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide(
+                        color: AppTheme.blue.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide(
+                        color: AppTheme.blue.withValues(alpha: 0.5),
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(18),
                       borderSide:
                           const BorderSide(color: AppTheme.cyan, width: 1.5),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 16,
+                      vertical: 12,
                     ),
                   ),
                   isExpanded: true,
@@ -162,19 +175,18 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
                                     fontWeight: FontWeight.w500,
                                     fontSize: 14,
                                   ),
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 if (sound.description.isNotEmpty)
-                                  Flexible(
-                                    child: Text(
-                                      sound.description,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.white38,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 1,
+                                  Text(
+                                    sound.description,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.white38,
                                     ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
                                   ),
                               ],
                             ),
@@ -243,18 +255,55 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
                 isPlaying && playingSoundId == effectiveSoundId;
 
             return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: AppTheme.surface.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(14),
+                color: const Color(0xB20E2042),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isCurrentPlaying
-                      ? AppTheme.cyan.withOpacity(0.5)
-                      : AppTheme.purple.withOpacity(0.3),
+                      ? AppTheme.cyan
+                      : AppTheme.purple.withValues(alpha: 0.65),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: (isCurrentPlaying ? AppTheme.cyan : AppTheme.purple)
+                        .withValues(alpha: 0.18),
+                    blurRadius: 16,
+                  ),
+                ],
               ),
               child: Row(
                 children: [
+                  ValueListenableBuilder<bool>(
+                    valueListenable: _isPlayingNotifier,
+                    builder: (context, _, __) {
+                      return ValueListenableBuilder<String?>(
+                        valueListenable: _playingSoundIdNotifier,
+                        builder: (context, playingSoundId, __) {
+                          final playing = _isPlayingNotifier.value &&
+                              playingSoundId == effectiveSoundId;
+                          return _GlowingPlayButton(
+                            isPlaying: playing,
+                            color: playing ? AppTheme.cyan : AppTheme.purple,
+                            onPressed: () async {
+                              if (playing) {
+                                await _soundService.stop();
+                              } else if (currentSound.isSystemSound &&
+                                  currentSound.systemUri != null) {
+                                await _soundService.playSound(
+                                  effectiveSoundId,
+                                  customUri: currentSound.systemUri,
+                                );
+                              } else {
+                                await _soundService.playSound(effectiveSoundId);
+                              }
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 12),
                   // Sound info
                   Expanded(
                     child: Column(
@@ -263,6 +312,8 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
                       children: [
                         Text(
                           'Preview: ${currentSound.name}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontWeight: FontWeight.w500,
                             fontSize: 13,
@@ -271,63 +322,63 @@ class _SoundPickerFieldState extends State<SoundPickerField> {
                           ),
                         ),
                         if (currentSound.description.isNotEmpty)
-                          Flexible(
-                            child: Text(
-                              currentSound.description,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white38,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
+                          Text(
+                            currentSound.description,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.white38,
                             ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                       ],
                     ),
                   ),
-
-                  // Play/Stop button with glow effect - isolated rebuild
-                  // Play/Stop button with glow effect - isolated rebuild
-                  ValueListenableBuilder<bool>(
-                    valueListenable: _isPlayingNotifier,
-                    builder: (context, _, __) {
-                      return ValueListenableBuilder<String?>(
-                        valueListenable: _playingSoundIdNotifier,
-                        builder: (context, playingSoundId, __) {
-                          final isCurrentPlaying = _isPlayingNotifier.value &&
-                              playingSoundId == effectiveSoundId;
-                          return _GlowingPlayButton(
-                            isPlaying: isCurrentPlaying,
-                            color: isCurrentPlaying
-                                ? AppTheme.cyan
-                                : AppTheme.purple,
-                            onPressed: () async {
-                              if (isCurrentPlaying) {
-                                await _soundService.stop();
-                              } else {
-                                if (currentSound.isSystemSound &&
-                                    currentSound.systemUri != null) {
-                                  await _soundService.playSound(
-                                    effectiveSoundId,
-                                    customUri: currentSound.systemUri,
-                                  );
-                                } else {
-                                  await _soundService
-                                      .playSound(effectiveSoundId);
-                                }
-                              }
-                            },
-                          );
-                        },
-                      );
-                    },
-                  ),
+                  const SizedBox(width: 10),
+                  _Waveform(active: isCurrentPlaying),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: Colors.white54),
                 ],
               ),
             );
           },
         );
       },
+    );
+  }
+}
+
+class _Waveform extends StatelessWidget {
+  const _Waveform({required this.active});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    const heights = [12.0, 22.0, 16.0, 28.0, 20.0, 25.0, 14.0, 21.0, 11.0];
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        for (var i = 0; i < heights.length; i++)
+          Container(
+            width: 3,
+            height: heights[i],
+            margin: const EdgeInsets.symmetric(horizontal: 1.5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(3),
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  AppTheme.purple,
+                  active ? AppTheme.cyan : AppTheme.blue,
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -382,12 +433,13 @@ class _GlowingPlayButtonState extends State<_GlowingPlayButton>
             boxShadow: [
               if (widget.isPlaying)
                 BoxShadow(
-                  color: widget.color.withOpacity(0.4 * _pulseAnimation.value),
+                  color: widget.color
+                      .withValues(alpha: 0.4 * _pulseAnimation.value),
                   blurRadius: 20 * _pulseAnimation.value,
                   spreadRadius: 2 * _pulseAnimation.value,
                 ),
               BoxShadow(
-                color: widget.color.withOpacity(0.2),
+                color: widget.color.withValues(alpha: 0.2),
                 blurRadius: 8,
                 spreadRadius: 1,
               ),
@@ -405,14 +457,14 @@ class _GlowingPlayButtonState extends State<_GlowingPlayButton>
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
                     colors: [
-                      widget.color.withOpacity(0.9),
+                      widget.color.withValues(alpha: 0.9),
                       widget.color,
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   border: Border.all(
-                    color: widget.color.withOpacity(0.5),
+                    color: widget.color.withValues(alpha: 0.5),
                     width: 1.5,
                   ),
                 ),
