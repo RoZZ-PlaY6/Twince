@@ -44,17 +44,47 @@ class _PreciseTimeDialogState extends State<_PreciseTimeDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        backgroundColor: AppTheme.surface,
+        backgroundColor: const Color(0xFF0A1734),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-          side: const BorderSide(color: AppTheme.cyan),
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(
+            color: AppTheme.cyan.withValues(alpha: 0.75),
+            width: 1.2,
+          ),
         ),
-        title: Text(widget.label, style: const TextStyle(color: AppTheme.cyan)),
+        title: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppTheme.purple, AppTheme.cyan],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.schedule_rounded, color: Colors.white),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                widget.label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 10,
               children: [
                 _selector(
                   'Hour',
@@ -62,14 +92,12 @@ class _PreciseTimeDialogState extends State<_PreciseTimeDialog> {
                   _hour,
                   (v) => setState(() => _hour = v),
                 ),
-                const SizedBox(width: 8),
                 _selector(
                   'Minute',
                   List<int>.generate(60, (i) => i), // 0-59
                   _minute,
                   (v) => setState(() => _minute = v),
                 ),
-                const SizedBox(width: 8),
                 _selector(
                   'Second',
                   List<int>.generate(60, (i) => i), // 0-59
@@ -119,17 +147,22 @@ class _PreciseTimeDialogState extends State<_PreciseTimeDialog> {
     void Function(T) onChanged,
   ) =>
       SizedBox(
-        width: 90,
+        width: 78,
         child: DropdownButtonFormField<T>(
           key: ValueKey('select-$label'),
-          value: value,
+          initialValue: value,
           decoration: InputDecoration(
             labelText: label,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: AppTheme.blue.withValues(alpha: 0.55),
+              ),
+            ),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             filled: true,
-            fillColor: AppTheme.background,
+            fillColor: const Color(0xA814264B),
           ),
           isExpanded: true,
           dropdownColor: AppTheme.surface,

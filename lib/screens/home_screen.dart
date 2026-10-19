@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -43,105 +45,319 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) => DefaultTabController(
         length: 3,
         child: Scaffold(
-          appBar: AppBar(
-            title: const Text(
-              'TWINCE',
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                letterSpacing: 3,
-                color: AppTheme.cyan,
-              ),
-            ),
-            actions: [
-              IconButton(
-                tooltip: 'Analytics',
-                icon: const Icon(Icons.insights_outlined, color: AppTheme.cyan),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                      builder: (_) => const AnalyticsScreen()),
-                ),
-              ),
-              const ExportBackupButton(),
-              IconButton(
-                tooltip: 'History',
-                icon: const Icon(Icons.history, color: AppTheme.cyan),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                      builder: (_) => const HistoryScreen()),
-                ),
-              ),
-              IconButton(
-                tooltip: 'Test notification',
-                icon: const Icon(Icons.notifications_outlined,
-                    color: AppTheme.cyan),
-                onPressed: () => showDialog<void>(
-                  context: context,
-                  builder: (_) =>
-                      TestNotificationDialog(onSend: _sendTestNotification),
-                ),
+          extendBody: true,
+          backgroundColor: const Color(0xFF030A19),
+          appBar: PreferredSize(
+            preferredSize: Size.fromHeight(_destination == 0 ? 112 : 64),
+            child: _glassTopBar(context),
+          ),
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              const ColoredBox(color: Color(0xFF030A19)),
+              const IgnorePointer(
+                  child: CustomPaint(painter: _NeonWavePainter())),
+              Consumer<StorageService>(
+                builder: (context, storage, _) {
+                  final tasks = storage.getAllTasks();
+                  if (_destination == 1) {
+                    return _taskList(
+                      context,
+                      storage,
+                      tasks,
+                      TaskStatus.pending,
+                      alarmOnly: true,
+                    );
+                  }
+                  return TabBarView(children: [
+                    _taskList(context, storage, tasks, TaskStatus.pending),
+                    _taskList(context, storage, tasks, TaskStatus.completed),
+                    _taskList(context, storage, tasks, TaskStatus.failed),
+                  ]);
+                },
               ),
             ],
-            bottom: _destination == 0
-                ? const TabBar(
-                    tabs: [
-                      Tab(text: 'Active'),
-                      Tab(text: 'Completed'),
-                      Tab(text: 'Failed'),
-                    ],
-                  )
-                : null,
           ),
-          body: Consumer<StorageService>(
-            builder: (context, storage, _) {
-              final tasks = storage.getAllTasks();
-              if (_destination == 1) {
-                return _taskList(
-                  context,
-                  storage,
-                  tasks,
-                  TaskStatus.pending,
-                  alarmOnly: true,
-                );
-              }
-              return TabBarView(children: [
-                _taskList(context, storage, tasks, TaskStatus.pending),
-                _taskList(context, storage, tasks, TaskStatus.completed),
-                _taskList(context, storage, tasks, TaskStatus.failed),
-              ]);
-            },
-          ),
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => showModalBottomSheet<void>(
-              context: context,
-              isScrollControlled: true,
-              showDragHandle: true,
-              builder: (_) => AddTaskBottomSheet(
-                storage: context.read<StorageService>(),
-                initialAlarmEnabled: _destination == 1,
+          floatingActionButton: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              gradient: const LinearGradient(
+                colors: [AppTheme.cyan, AppTheme.blue, AppTheme.purple],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.cyan.withValues(alpha: 0.35),
+                  blurRadius: 20,
+                  spreadRadius: 1,
+                ),
+                BoxShadow(
+                  color: AppTheme.purple.withValues(alpha: 0.3),
+                  blurRadius: 26,
+                  offset: const Offset(6, 4),
+                ),
+              ],
+            ),
+            child: FloatingActionButton.extended(
+              elevation: 0,
+              backgroundColor: Colors.transparent,
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                showDragHandle: true,
+                builder: (_) => AddTaskBottomSheet(
+                  storage: context.read<StorageService>(),
+                  initialAlarmEnabled: _destination == 1,
+                ),
+              ),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text(
+                'Add task',
+                style: TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
-            icon: const Icon(Icons.add),
-            label: const Text('Add task'),
           ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _destination,
-            onDestinationSelected: (index) =>
-                setState(() => _destination = index),
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.task_alt_outlined),
-                selectedIcon: Icon(Icons.task_alt),
-                label: 'Tasks',
+          bottomNavigationBar: _glassBottomNavigation(),
+        ),
+      );
+
+  Widget _glassTopBar(BuildContext context) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF030A19),
+              border: Border(
+                bottom: BorderSide(
+                  color: AppTheme.cyan.withValues(alpha: 0.65),
+                  width: 1.2,
+                ),
               ),
-              NavigationDestination(
-                icon: Icon(Icons.alarm_outlined),
-                selectedIcon: Icon(Icons.alarm),
-                label: 'Alarmed Tasks',
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.cyan.withValues(alpha: 0.2),
+                  blurRadius: 18,
+                ),
+                BoxShadow(
+                  color: AppTheme.purple.withValues(alpha: 0.25),
+                  blurRadius: 24,
+                  offset: const Offset(12, 5),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 58,
+                    child: Row(
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(left: 18),
+                          child: Text(
+                            'TWINCE',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2.4,
+                              color: AppTheme.cyan,
+                              fontSize: 17,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          tooltip: 'Analytics',
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.insights_outlined,
+                              color: AppTheme.cyan),
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                                builder: (_) => const AnalyticsScreen()),
+                          ),
+                        ),
+                        const ExportBackupButton(),
+                        IconButton(
+                          tooltip: 'History',
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.history, color: AppTheme.cyan),
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                                builder: (_) => const HistoryScreen()),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Test notification',
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.notifications_outlined,
+                              color: AppTheme.cyan),
+                          onPressed: () => showDialog<void>(
+                            context: context,
+                            builder: (_) => TestNotificationDialog(
+                                onSend: _sendTestNotification),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                    ),
+                  ),
+                  if (_destination == 0)
+                    Expanded(
+                      child: TabBar(
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        indicatorPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 4),
+                        indicator: BoxDecoration(
+                          borderRadius: BorderRadius.circular(24),
+                          gradient: LinearGradient(
+                            colors: [
+                              AppTheme.blue.withValues(alpha: 0.05),
+                              AppTheme.purple.withValues(alpha: 0.2),
+                            ],
+                          ),
+                          border: Border(
+                            bottom: BorderSide(
+                              color: AppTheme.purple.withValues(alpha: 0.95),
+                              width: 3,
+                            ),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.purple.withValues(alpha: 0.45),
+                              blurRadius: 16,
+                            ),
+                          ],
+                        ),
+                        labelColor: Colors.white,
+                        unselectedLabelColor: Colors.white70,
+                        tabs: const [
+                          Tab(text: 'Active'),
+                          Tab(text: 'Completed'),
+                          Tab(text: 'Failed'),
+                        ],
+                      ),
+                    ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       );
+
+  Widget _glassBottomNavigation() => SafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(
+              height: 70,
+              decoration: BoxDecoration(
+                color: const Color(0xDE0A162D),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: AppTheme.cyan.withValues(alpha: 0.62),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.cyan.withValues(alpha: 0.18),
+                    blurRadius: 18,
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  _bottomItem(
+                    index: 0,
+                    label: 'Tasks',
+                    icon: Icons.task_alt_outlined,
+                    selectedIcon: Icons.task_alt_rounded,
+                  ),
+                  _bottomItem(
+                    index: 1,
+                    label: 'Alarmed Tasks',
+                    icon: Icons.alarm_outlined,
+                    selectedIcon: Icons.alarm_rounded,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+  Widget _bottomItem({
+    required int index,
+    required String label,
+    required IconData icon,
+    required IconData selectedIcon,
+  }) {
+    final selected = _destination == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _destination = index),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 5),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                gradient: selected
+                    ? LinearGradient(
+                        colors: [
+                          AppTheme.blue.withValues(alpha: 0.22),
+                          AppTheme.purple.withValues(alpha: 0.38),
+                        ],
+                      )
+                    : null,
+                border: selected
+                    ? Border.all(color: AppTheme.purple.withValues(alpha: 0.5))
+                    : null,
+              ),
+              child: Icon(
+                selected ? selectedIcon : icon,
+                size: 20,
+                color: selected ? Colors.white : Colors.white70,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : Colors.white70,
+                fontSize: 11,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 2),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              width: selected ? 4 : 3,
+              height: selected ? 4 : 3,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: selected
+                    ? AppTheme.cyan
+                    : Colors.white.withValues(alpha: 0.18),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color: AppTheme.cyan.withValues(alpha: 0.7),
+                          blurRadius: 7,
+                        )
+                      ]
+                    : null,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _taskList(BuildContext context, StorageService storage,
       List<Task> tasks, TaskStatus status,
@@ -177,12 +393,7 @@ class _HomeScreenState extends State<HomeScreen> {
     for (final task in filtered) {
       final definitionId = task.recurringDefinitionId;
       final occurrences = occurrencesByDefinition[definitionId];
-      final hasMultipleDays = definitionId != null &&
-          (storage.getRecurringTaskById(definitionId)?.weekdays.length ?? 0) >
-              1;
-      if (definitionId != null &&
-          occurrences != null &&
-          (hasMultipleDays || occurrences.length > 1)) {
+      if (definitionId != null && occurrences != null) {
         if (addedGroups.add(definitionId)) {
           entries.add(_RecurringOccurrences(definitionId, occurrences));
         }
@@ -192,7 +403,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 90),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 104),
       itemCount: entries.length,
       itemBuilder: (context, index) {
         final entry = entries[index];
@@ -217,22 +428,70 @@ class _HomeScreenState extends State<HomeScreen> {
         };
         return Container(
           key: ValueKey('recurring-${status.name}-${group.definitionId}'),
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: AppTheme.neonCard(accent: accent),
+          margin: const EdgeInsets.only(bottom: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xB5102139),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: accent.withValues(alpha: 0.9),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: 0.28),
+                blurRadius: 16,
+              ),
+              BoxShadow(
+                color: AppTheme.purple.withValues(alpha: 0.15),
+                blurRadius: 26,
+                offset: const Offset(10, 8),
+              ),
+            ],
+          ),
           clipBehavior: Clip.antiAlias,
           child: ExpansionTile(
             key: PageStorageKey(
                 'recurring-${status.name}-${group.definitionId}'),
-            leading: Icon(Icons.repeat, color: accent),
+            leading: Icon(Icons.repeat_rounded, color: accent),
             iconColor: accent,
             collapsedIconColor: accent,
             shape: const Border(),
             collapsedShape: const Border(),
-            title: Text(definition?.title ?? group.occurrences.first.title),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    definition?.title ?? group.occurrences.first.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                if (definition != null)
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: accent,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                    ),
+                    icon: const Icon(Icons.edit_rounded, size: 18),
+                    label: const Text('Edit all'),
+                    onPressed: () => showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      showDragHandle: true,
+                      builder: (_) => AddTaskBottomSheet(
+                        storage: storage,
+                        task: group.occurrences.first,
+                        editAll: true,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             subtitle: Text(
               [if (weekdays.isNotEmpty) weekdays, '$count $statusLabel']
                   .join('  ·  '),
-              style: const TextStyle(color: Colors.white70),
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
             ),
             childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
             children: [
@@ -296,4 +555,69 @@ class _RecurringOccurrences {
 
   final String definitionId;
   final List<Task> occurrences;
+}
+
+class _NeonWavePainter extends CustomPainter {
+  const _NeonWavePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final ambient = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          AppTheme.blue.withValues(alpha: 0.13),
+          AppTheme.purple.withValues(alpha: 0.04),
+          Colors.transparent,
+        ],
+      ).createShader(
+        Rect.fromCircle(
+          center: Offset(size.width * 0.72, size.height * 0.38),
+          radius: size.longestSide * 0.58,
+        ),
+      );
+    canvas.drawRect(Offset.zero & size, ambient);
+
+    void wave({
+      required double y,
+      required Color color,
+      required double bend,
+      required double width,
+    }) {
+      final path = Path()
+        ..moveTo(-size.width * 0.08, y)
+        ..cubicTo(
+          size.width * 0.18,
+          y - bend,
+          size.width * 0.48,
+          y + bend,
+          size.width * 1.08,
+          y - bend * 0.45,
+        );
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = width * 7
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24)
+          ..color = color.withValues(alpha: 0.08),
+      );
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = width
+          ..color = color.withValues(alpha: 0.65),
+      );
+    }
+
+    wave(
+      y: size.height * 0.2,
+      color: AppTheme.cyan,
+      bend: size.height * 0.08,
+      width: 0.7,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _NeonWavePainter oldDelegate) => false;
 }
