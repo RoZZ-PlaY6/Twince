@@ -68,11 +68,15 @@ class AddTaskBottomSheet extends StatefulWidget {
     this.task,
     this.editAll = false,
     this.initialAlarmEnabled = false,
+    this.templateDate,
+    this.onSaveTemplate,
   });
   final StorageService storage;
   final Task? task;
   final bool editAll;
   final bool initialAlarmEnabled;
+  final DateTime? templateDate;
+  final Future<void> Function(Task task)? onSaveTemplate;
 
   @override
   State<AddTaskBottomSheet> createState() => _AddTaskBottomSheetState();
@@ -102,12 +106,15 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
   RecurringTask? _editingRecurringTask;
 
   bool get _retrying =>
-      !widget.editAll && widget.task?.status == TaskStatus.failed;
+      !widget.editAll &&
+      widget.onSaveTemplate == null &&
+      widget.task?.status == TaskStatus.failed;
 
   @override
   void initState() {
     super.initState();
     _isAlarm = widget.initialAlarmEnabled;
+    if (widget.templateDate != null) _date = widget.templateDate!;
     final task = widget.task;
     if (task == null) return;
     _title.text = task.title;
@@ -174,6 +181,9 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
 
   String get _buttonText {
     if (_saving) return 'Saving…';
+    if (widget.onSaveTemplate != null) {
+      return widget.task == null ? 'Add to plan' : 'Save plan task';
+    }
     if (_retrying) return 'Retry task';
     if (widget.task == null) {
       return _recurring ? 'Create recurring task' : 'Create task';
@@ -292,7 +302,8 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
       selectedStartTime: _start,
       selectedEndTime: _end,
       now: now,
-      adjustPassedAlarm: _isAlarm && !widget.editAll,
+      adjustPassedAlarm:
+          _isAlarm && !widget.editAll && widget.onSaveTemplate == null,
     );
     if (_retrying && !schedule.startTime.isAfter(now)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -301,6 +312,7 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
       return;
     }
     if (widget.task != null &&
+        widget.onSaveTemplate == null &&
         !widget.editAll &&
         !schedule.endTime.isAfter(now)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -309,6 +321,7 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
       return;
     }
     if (_isAlarm &&
+        widget.onSaveTemplate == null &&
         !widget.editAll &&
         schedule.endTime.isBefore(now.subtract(const Duration(seconds: 30)))) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -340,7 +353,27 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
       final customMessage = _customMessageController.text.trim().isEmpty
           ? null
           : _customMessageController.text.trim();
-      if (existing == null) {
+      if (widget.onSaveTemplate != null) {
+        await widget.onSaveTemplate!(Task(
+          id: existing?.id,
+          title: _title.text,
+          description: _description.text.trim(),
+          category: _category,
+          targetDate: date,
+          startTime: start,
+          endTime: end,
+          reminderIntervalMinutes: interval,
+          createdAt: existing?.createdAt,
+          customNotificationMessage: customMessage,
+          notificationSoundId: _notificationSoundId,
+          customSystemSoundUri: _customSystemSoundUri,
+          notificationTimerOptions: _notificationTimerOptions,
+          isAlarm: _isAlarm,
+          alarmSoundType: _alarmSoundType,
+          alarmSoundId: _alarmSoundId,
+          alarmSoundUri: _alarmSoundUri,
+        ));
+      } else if (existing == null) {
         if (_recurring) {
           if (_weekdays.isEmpty) {
             throw ArgumentError('Select at least one weekday');
@@ -651,42 +684,44 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
                         _GlassPanel(
                           child: Column(
                             children: [
-                              SwitchTheme(
-                                data: SwitchTheme.of(context).copyWith(
-                                  thumbColor: WidgetStateProperty.resolveWith(
-                                      (states) => Colors.white),
-                                  trackColor: WidgetStateProperty.resolveWith(
-                                    (states) =>
-                                        states.contains(WidgetState.selected)
-                                            ? AppTheme.purple
-                                            : const Color(0xFF26375E),
+                              if (widget.onSaveTemplate == null)
+                                SwitchTheme(
+                                  data: SwitchTheme.of(context).copyWith(
+                                    thumbColor: WidgetStateProperty.resolveWith(
+                                        (states) => Colors.white),
+                                    trackColor: WidgetStateProperty.resolveWith(
+                                      (states) =>
+                                          states.contains(WidgetState.selected)
+                                              ? AppTheme.purple
+                                              : const Color(0xFF26375E),
+                                    ),
+                                  ),
+                                  child: SwitchListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    title: const Text(
+                                      'Recurring task',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w700),
+                                    ),
+                                    subtitle: const Text(
+                                      'Repeat on selected weekdays',
+                                      style: TextStyle(color: Colors.white54),
+                                    ),
+                                    value: _recurring,
+                                    onChanged: _retrying ||
+                                            widget.task
+                                                    ?.recurringDefinitionId !=
+                                                null
+                                        ? null
+                                        : (value) => setState(() {
+                                              _recurring = value;
+                                              if (value && _weekdays.isEmpty) {
+                                                _weekdays.add(
+                                                    DateTime.now().weekday);
+                                              }
+                                            }),
                                   ),
                                 ),
-                                child: SwitchListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  title: const Text(
-                                    'Recurring task',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.w700),
-                                  ),
-                                  subtitle: const Text(
-                                    'Repeat on selected weekdays',
-                                    style: TextStyle(color: Colors.white54),
-                                  ),
-                                  value: _recurring,
-                                  onChanged: _retrying ||
-                                          widget.task?.recurringDefinitionId !=
-                                              null
-                                      ? null
-                                      : (value) => setState(() {
-                                            _recurring = value;
-                                            if (value && _weekdays.isEmpty) {
-                                              _weekdays
-                                                  .add(DateTime.now().weekday);
-                                            }
-                                          }),
-                                ),
-                              ),
                               if (_recurring) ...[
                                 const Align(
                                   alignment: Alignment.centerLeft,
@@ -739,28 +774,29 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
                                 ),
                               ],
                               const SizedBox(height: 12),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  style: _neonButtonStyle(),
-                                  icon:
-                                      const Icon(Icons.calendar_month_rounded),
-                                  label: Text(
-                                    'Date: ${DateFormat.yMMMd().format(_date)}',
+                              if (widget.onSaveTemplate == null)
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    style: _neonButtonStyle(),
+                                    icon: const Icon(
+                                        Icons.calendar_month_rounded),
+                                    label: Text(
+                                      'Date: ${DateFormat.yMMMd().format(_date)}',
+                                    ),
+                                    onPressed: () async {
+                                      final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate: _date,
+                                        firstDate: DateTime(2000),
+                                        lastDate: DateTime(2100),
+                                      );
+                                      if (picked != null) {
+                                        setState(() => _date = picked);
+                                      }
+                                    },
                                   ),
-                                  onPressed: () async {
-                                    final picked = await showDatePicker(
-                                      context: context,
-                                      initialDate: _date,
-                                      firstDate: DateTime(2000),
-                                      lastDate: DateTime(2100),
-                                    );
-                                    if (picked != null) {
-                                      setState(() => _date = picked);
-                                    }
-                                  },
                                 ),
-                              ),
                               const SizedBox(height: 10),
                               LayoutBuilder(
                                 builder: (context, constraints) {

@@ -84,7 +84,19 @@ class StorageService extends ChangeNotifier {
     await generateRecurringInstances();
   }
 
-  /// Updates an existing recurring task definition and regenerates instances
+  /// Removes a recurring definition and every occurrence, including history.
+  Future<void> deleteRecurringTask(String id) async {
+    await _recurringBox.delete(id);
+    final occurrences = getAllTasks()
+        .where((task) => task.recurringDefinitionId == id)
+        .toList();
+    for (final task in occurrences) {
+      await deleteTask(task.id);
+    }
+    notifyListeners();
+  }
+
+  /// Updates an existing recurring task definition and regenerates instances.
   Future<void> updateRecurringTask(RecurringTask definition,
       {bool applyToAllOccurrences = false}) async {
     if (!_recurringBox.containsKey(definition.id)) {

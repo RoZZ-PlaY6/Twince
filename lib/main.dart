@@ -7,6 +7,7 @@ import 'services/notification_service.dart';
 import 'services/alarm_service.dart';
 import 'services/reminder_scheduler_service.dart';
 import 'services/storage_service.dart';
+import 'services/plan_service.dart';
 import 'services/time_watcher_service.dart';
 import 'theme/app_theme.dart';
 
@@ -26,6 +27,7 @@ Future<void> main() async {
       alarms: AlarmService.instance,
     );
     await storage.reconcile();
+    final plans = await PlanService.initialize(storage);
 
     // Initialize and start the foreground reminder scheduler
     final reminderScheduler = ReminderSchedulerService(
@@ -35,6 +37,7 @@ Future<void> main() async {
 
     runApp(TwinceApp(
       storage: storage,
+      plans: plans,
       reminderScheduler: reminderScheduler,
     ));
   } catch (error) {
@@ -79,9 +82,11 @@ class TwinceApp extends StatefulWidget {
   const TwinceApp({
     super.key,
     required this.storage,
+    required this.plans,
     required this.reminderScheduler,
   });
   final StorageService storage;
+  final PlanService plans;
   final ReminderSchedulerService reminderScheduler;
 
   @override
@@ -104,6 +109,7 @@ class _TwinceAppState extends State<TwinceApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       widget.storage.reconcile();
+      widget.plans.generateUpcoming();
     }
   }
 
@@ -111,13 +117,17 @@ class _TwinceAppState extends State<TwinceApp> with WidgetsBindingObserver {
   void dispose() {
     _watcher.dispose();
     _reminderScheduler.dispose();
+    widget.plans.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => ChangeNotifierProvider.value(
-        value: widget.storage,
+  Widget build(BuildContext context) => MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: widget.storage),
+          ChangeNotifierProvider.value(value: widget.plans),
+        ],
         child: MaterialApp(
           title: 'Twince',
           debugShowCheckedModeBanner: false,

@@ -15,6 +15,7 @@ import '../widgets/export_backup_button.dart';
 import 'add_task_bottom_sheet.dart';
 import 'analytics_screen.dart';
 import 'history_screen.dart';
+import 'plan_screen.dart';
 
 @visibleForTesting
 List<Task> activeAlarmedTasks(List<Task> tasks, {DateTime? now}) {
@@ -60,6 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Consumer<StorageService>(
                 builder: (context, storage, _) {
                   final tasks = storage.getAllTasks();
+                  if (_destination == 2) return const PlanScreen();
                   if (_destination == 1) {
                     return _taskList(
                       context,
@@ -100,18 +102,20 @@ class _HomeScreenState extends State<HomeScreen> {
             child: FloatingActionButton.extended(
               elevation: 0,
               backgroundColor: Colors.transparent,
-              onPressed: () => showModalBottomSheet<void>(
-                context: context,
-                isScrollControlled: true,
-                showDragHandle: true,
-                builder: (_) => AddTaskBottomSheet(
-                  storage: context.read<StorageService>(),
-                  initialAlarmEnabled: _destination == 1,
-                ),
-              ),
+              onPressed: () => _destination == 2
+                  ? showAddPlanFlow(context)
+                  : showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      showDragHandle: true,
+                      builder: (_) => AddTaskBottomSheet(
+                        storage: context.read<StorageService>(),
+                        initialAlarmEnabled: _destination == 1,
+                      ),
+                    ),
               icon: const Icon(Icons.add_rounded),
-              label: const Text(
-                'Add task',
+              label: Text(
+                _destination == 2 ? 'Add Plan' : 'Add task',
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
@@ -280,6 +284,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     label: 'Alarmed Tasks',
                     icon: Icons.alarm_outlined,
                     selectedIcon: Icons.alarm_rounded,
+                  ),
+                  _bottomItem(
+                    index: 2,
+                    label: 'Plan',
+                    icon: Icons.event_note_outlined,
+                    selectedIcon: Icons.event_note_rounded,
                   ),
                 ],
               ),
@@ -486,6 +496,22 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
+                PopupMenuButton<String>(
+                  tooltip: 'Recurring task actions',
+                  icon: const Icon(Icons.more_vert_rounded, size: 20),
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                      value: 'deleteAll',
+                      child: Row(children: [
+                        Icon(Icons.delete_outline_rounded, size: 18),
+                        SizedBox(width: 8),
+                        Text('Delete all'),
+                      ]),
+                    ),
+                  ],
+                  onSelected: (_) => _confirmDeleteRecurring(
+                      context, storage, group.definitionId),
+                ),
               ],
             ),
             subtitle: Text(
@@ -514,6 +540,14 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
+  }
+
+  Future<void> _confirmDeleteRecurring(
+      BuildContext context, StorageService storage, String id) async {
+    final confirmed = await confirmDeleteAllOccurrences(context);
+    if (confirmed == true && context.mounted) {
+      await _perform(context, storage.deleteRecurringTask(id));
+    }
   }
 
   Widget _taskCard(BuildContext context, StorageService storage, Task task) {
@@ -548,6 +582,27 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
   }
+}
+
+@visibleForTesting
+Future<bool> confirmDeleteAllOccurrences(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Delete recurring task?'),
+      content: const Text(
+          'All occurrences of this recurring task, including completed and failed ones, will be deleted.'),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel')),
+        FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete all')),
+      ],
+    ),
+  );
+  return confirmed == true;
 }
 
 class _RecurringOccurrences {
