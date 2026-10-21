@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// Returns a local time carrying hour, minute, and second from structured selection.
+/// Returns the selected hour and minute, retaining existing stored seconds.
 Future<DateTime?> showPreciseTimePicker({
   required BuildContext context,
   required DateTime initialTime,
@@ -25,9 +25,8 @@ class _PreciseTimeDialog extends StatefulWidget {
 }
 
 class _PreciseTimeDialogState extends State<_PreciseTimeDialog> {
-  late int _hour; // 0-23
+  late int _hour; // 1-12
   late int _minute; // 0-59
-  late int _second; // 0-59
   late bool _isPm;
 
   @override
@@ -37,7 +36,6 @@ class _PreciseTimeDialogState extends State<_PreciseTimeDialog> {
     final hour12 = widget.initialTime.hour % 12;
     _hour = hour12 == 0 ? 12 : hour12; // 1-12 for display
     _minute = widget.initialTime.minute;
-    _second = widget.initialTime.second;
   }
 
   int get _hour24 => _hour % 12 + (_isPm ? 12 : 0);
@@ -98,12 +96,6 @@ class _PreciseTimeDialogState extends State<_PreciseTimeDialog> {
                   _minute,
                   (v) => setState(() => _minute = v),
                 ),
-                _selector(
-                  'Second',
-                  List<int>.generate(60, (i) => i), // 0-59
-                  _second,
-                  (v) => setState(() => _second = v),
-                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -132,7 +124,7 @@ class _PreciseTimeDialogState extends State<_PreciseTimeDialog> {
                     widget.initialTime.day,
                     _hour24,
                     _minute,
-                    _second,
+                    widget.initialTime.second,
                   ));
             },
             child: const Text('Set time'),
@@ -147,7 +139,7 @@ class _PreciseTimeDialogState extends State<_PreciseTimeDialog> {
     void Function(T) onChanged,
   ) =>
       SizedBox(
-        width: 78,
+        width: 104,
         child: DropdownButtonFormField<T>(
           key: ValueKey('select-$label'),
           initialValue: value,

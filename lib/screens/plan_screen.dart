@@ -201,7 +201,7 @@ Future<bool> confirmDeletePlan(BuildContext context, String planName) async {
 String _entryLabel(PlanEntry entry, bool university) =>
     '${_days[entry.weekday - 1]} · ${_clock(entry.startSecond)}–${_clock(entry.endSecond)}${university ? ' · ${entry.weeks == 'odd' ? 'Z' : entry.weeks == 'even' ? 'F' : 'Z / F'}' : ''}';
 
-String _clock(int seconds) => DateFormat('HH:mm:ss')
+String _clock(int seconds) => DateFormat('HH:mm')
     .format(DateTime(2000, 1, 1).add(Duration(seconds: seconds)));
 
 class _PlanEditor extends StatefulWidget {

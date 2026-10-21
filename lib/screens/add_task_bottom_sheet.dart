@@ -7,6 +7,7 @@ import '../models/task.dart';
 import '../models/recurring_task.dart';
 import '../services/storage_service.dart';
 import '../services/alarm_service.dart';
+import '../services/user_preferences_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/alarm_sound_picker.dart';
 import '../widgets/precise_time_picker.dart';
@@ -89,8 +90,8 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
   final _intervalController = TextEditingController(text: '60');
   final _customMessageController = TextEditingController();
   DateTime _date = DateTime.now();
-  DateTime _start = DateTime.now();
-  DateTime _end = DateTime.now().add(const Duration(hours: 1));
+  late DateTime _start;
+  late DateTime _end;
   TaskCategory _category = TaskCategory.etc;
   String _notificationSoundId = 'cyber_pulse';
   String? _customSystemSoundUri;
@@ -113,10 +114,22 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _start = DateTime(now.year, now.month, now.day, now.hour, now.minute);
+    _end = _start.add(const Duration(hours: 1));
     _isAlarm = widget.initialAlarmEnabled;
     if (widget.templateDate != null) _date = widget.templateDate!;
     final task = widget.task;
-    if (task == null) return;
+    if (task == null) {
+      // New task: default the alarm tone to the user's last saved selection.
+      final last = UserPreferencesService.instance.getLastAlarmSound();
+      if (last != null) {
+        _alarmSoundType = last.type;
+        _alarmSoundId = last.label;
+        _alarmSoundUri = last.uri;
+        }
+      return;
+    }
     _title.text = task.title;
     _description.text = task.description;
     _category = task.category;
@@ -158,7 +171,7 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
         _alarmSoundId = definition.alarmSoundId;
         _alarmSoundUri = definition.alarmSoundUri;
         _weekdays.addAll(definition.weekdays);
-      }
+    }
     }
   }
 
@@ -177,7 +190,7 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
     return end.isAfter(start) ? end : end.add(const Duration(days: 1));
   }
 
-  String _formatTime(DateTime value) => DateFormat('HH:mm:ss').format(value);
+  String _formatTime(DateTime value) => DateFormat('HH:mm').format(value);
 
   String get _buttonText {
     if (_saving) return 'Saving…';
@@ -373,7 +386,7 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
           alarmSoundId: _alarmSoundId,
           alarmSoundUri: _alarmSoundUri,
         ));
-      } else if (existing == null) {
+    } else if (existing == null) {
         if (_recurring) {
           if (_weekdays.isEmpty) {
             throw ArgumentError('Select at least one weekday');
@@ -415,7 +428,17 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
             alarmSoundUri: _alarmSoundUri,
           ));
         }
-      } else {
+        // Persist the alarm tone for future new alarmed tasks.
+        if (_isAlarm) {
+          await UserPreferencesService.instance.saveLastAlarmSound(
+            SavedAlarmPreference(
+              type: _alarmSoundType,
+              label: _alarmSoundId,
+              uri: _alarmSoundUri,
+              ),
+          );
+        }
+    } else {
         // Check if we're editing a recurring task definition
         if (_editingRecurringTask != null && _recurring) {
           if (_weekdays.isEmpty) {
@@ -468,14 +491,14 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
             await widget.storage.updateTask(edited);
           }
         }
-      }
+    }
       if (mounted) Navigator.of(context).pop();
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Could not save task: $error')));
-      }
+    }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -1058,3 +1081,5 @@ class _GlassPanel extends StatelessWidget {
         child: child,
       );
 }
+
+

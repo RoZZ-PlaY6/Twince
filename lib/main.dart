@@ -9,12 +9,14 @@ import 'services/reminder_scheduler_service.dart';
 import 'services/storage_service.dart';
 import 'services/plan_service.dart';
 import 'services/time_watcher_service.dart';
+import 'services/user_preferences_service.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize timezone database (required before using tz.local)
+  await UserPreferencesService.instance.init();
   tz.initializeTimeZones();
 
   try {
