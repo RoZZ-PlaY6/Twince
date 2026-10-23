@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -98,12 +100,15 @@ class _TwinceAppState extends State<TwinceApp> with WidgetsBindingObserver {
     _watcher = TimeWatcherService(widget.storage)..start();
     _reminderScheduler = widget.reminderScheduler;
     WidgetsBinding.instance.addObserver(this);
+    AlarmService.instance.listenForRestarts(widget.storage);
+    unawaited(AlarmService.instance.consumePendingRestarts(widget.storage));
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       widget.storage.reconcile();
+      unawaited(AlarmService.instance.consumePendingRestarts(widget.storage));
     }
   }
 

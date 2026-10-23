@@ -69,9 +69,14 @@ class MainActivity : FlutterActivity() {
                 startActivityForResult(intent, 42)
             }
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "twince/alarms")
-            .setMethodCallHandler { call, result ->
+        val alarmChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "twince/alarms")
+        AlarmRestartQueue.onPending = {
+            runOnUiThread { alarmChannel.invokeMethod("pendingRestarts", null) }
+        }
+        alarmChannel.setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "consumePendingRestarts" ->
+                        result.success(AlarmRestartQueue.consume(this))
                     "canScheduleExactAlarms" -> result.success(AlarmScheduler.canSchedule(this))
                     "requestExactAlarmAccess" -> {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&

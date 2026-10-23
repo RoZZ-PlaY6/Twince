@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../models/task.dart';
+import 'alarm_restart.dart';
+import 'storage_service.dart';
 
 class AlarmSoundSelection {
   const AlarmSoundSelection({required this.uri, required this.label});
@@ -43,6 +45,39 @@ class AlarmService {
       'soundType': task.alarmSoundType.name,
       'soundId': task.alarmSoundId,
       'soundUri': task.alarmSoundUri,
+      'category': task.category.name,
+      'startAtMillis': task.startTime.toLocal().millisecondsSinceEpoch,
+      'endAtMillis': task.endTime.toLocal().millisecondsSinceEpoch,
+      'reminderIntervalMinutes': task.reminderIntervalMinutes,
+      'isTimeBound': task.isTimeBound,
+      'notificationSoundId': task.notificationSoundId,
+      'customNotificationMessage': task.customNotificationMessage,
+      'customSystemSoundUri': task.customSystemSoundUri,
+      'notificationTimers':
+          task.notificationTimerOptions.map((option) => option.name).join(','),
+    });
+  }
+
+  /// Creates Restart copies that were requested while Flutter was not running.
+  /// This does not change the original task.
+  Future<void> consumePendingRestarts(StorageService storage) async {
+    if (!_isAndroid) return;
+    final pending =
+        await _channel.invokeMethod<List<dynamic>>('consumePendingRestarts');
+    for (final item in pending ?? const <dynamic>[]) {
+      if (item is! Map) continue;
+      await storage.addTask(
+        buildRestartedAlarmTaskFromMap(item, DateTime.now()),
+      );
+    }
+  }
+
+  void listenForRestarts(StorageService storage) {
+    if (!_isAndroid) return;
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'pendingRestarts') {
+        await consumePendingRestarts(storage);
+      }
     });
   }
 
