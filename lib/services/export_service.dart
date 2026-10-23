@@ -5,7 +5,8 @@ import 'package:flutter/services.dart';
 
 import '../models/recurring_task.dart';
 import '../models/task.dart';
-import 'export_file.dart';
+import 'backup_library.dart';
+import 'backup_policy.dart';
 import 'storage_service.dart';
 
 enum ExportStatus { shared, noData, unavailable }
@@ -20,12 +21,10 @@ class ExportService {
   static final instance = ExportService._();
   static const _channel = MethodChannel('twince/export');
 
-  Future<ExportResult> exportAndShare(StorageService storage) async {
+  String? encodeBackup(StorageService storage) {
     final tasks = storage.getAllTasks();
     final recurringDefinitions = storage.getRecurringTasks();
-    if (tasks.isEmpty && recurringDefinitions.isEmpty) {
-      return const ExportResult(ExportStatus.noData);
-    }
+    if (tasks.isEmpty && recurringDefinitions.isEmpty) return null;
 
     final taskMaps = tasks.map(_taskToJson).toList(growable: false);
     final recurringMaps =
@@ -64,13 +63,23 @@ class ExportService {
       },
     };
 
-    final contents = const JsonEncoder.withIndent('  ').convert(payload);
-    final fileName =
-        'twince_backup_${DateTime.now().toIso8601String().replaceAll(':', '-')}.json';
-    final path = await writeExportFile(fileName, contents);
-    if (path == null || kIsWeb)
-      return const ExportResult(ExportStatus.unavailable);
+    return const JsonEncoder.withIndent('  ').convert(payload);
+  }
 
+  Future<ExportResult> exportAndShare(StorageService storage) async {
+    final contents = encodeBackup(storage);
+    if (contents == null) return const ExportResult(ExportStatus.noData);
+    final created = await BackupLibrary.instance.createNew(
+      name: timestampedBackupName(DateTime.now()),
+      contents: contents,
+    );
+    return shareExisting(created.path, created.name);
+  }
+
+  Future<ExportResult> shareExisting(String? path, String fileName) async {
+    if (path == null || path.isEmpty || kIsWeb) {
+      return const ExportResult(ExportStatus.unavailable);
+    }
     await _channel.invokeMethod<void>('shareFile', <String, dynamic>{
       'path': path,
       'fileName': fileName,

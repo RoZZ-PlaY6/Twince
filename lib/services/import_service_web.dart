@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use, avoid_web_libraries_in_flutter
+
 import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:async';
@@ -7,6 +9,7 @@ import 'package:file_picker/file_picker.dart';
 
 import '../models/recurring_task.dart';
 import '../models/task.dart';
+import 'backup_library.dart';
 import 'import_service.dart';
 import 'storage_service.dart';
 
@@ -92,7 +95,7 @@ class ImportService {
       );
 
       if (result == null || result.files.isEmpty) {
-        return const ImportResult(ImportStatus.unavailable);
+        return const ImportResult(ImportStatus.cancelled);
       }
 
       final file = result.files.first;
@@ -120,7 +123,27 @@ class ImportService {
         return const ImportResult(ImportStatus.invalidFormat);
       }
 
-      return await importFromJson(storage, content);
+      final imported = await importFromJson(storage, content);
+      if (imported.status != ImportStatus.success) return imported;
+      String? backupName;
+      var backupWritable = false;
+      try {
+        final active = await BackupLibrary.instance.rememberImport(
+          suggestedName: file.name,
+          contents: content,
+        );
+        backupName = active.name;
+        backupWritable = active.canUpdate;
+      } catch (error) {
+        debugPrint('Imported data, but could not remember the file: $error');
+      }
+      return ImportResult(
+        ImportStatus.success,
+        tasksImported: imported.tasksImported,
+        recurringImported: imported.recurringImported,
+        backupName: backupName,
+        backupWritable: backupWritable,
+      );
     } catch (e) {
       debugPrint('Web import failed: $e');
       return const ImportResult(ImportStatus.invalidFormat);

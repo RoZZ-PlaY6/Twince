@@ -169,7 +169,7 @@ void main() {
     );
   });
 
-  test('standard task filter excludes alarmed tasks', () {
+  test('main task filter includes alarmed tasks', () {
     final day = DateTime(2026, 10, 6);
     Task task(String title, {bool alarm = false}) => Task(
           title: title,
@@ -184,7 +184,7 @@ void main() {
       TaskStatus.pending,
     );
 
-    expect(filtered.map((task) => task.title), ['standard']);
+    expect(filtered.map((task) => task.title), ['standard', 'alarmed']);
   });
 
   testWidgets('alarm sound picker exposes all three sound sources',

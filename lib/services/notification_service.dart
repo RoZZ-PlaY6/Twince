@@ -157,7 +157,6 @@ class NotificationService {
   List<_ScheduledNotification> _calculateNotificationTimes(
       Task task, DateTime now) {
     final times = <_ScheduledNotification>[];
-    final duration = task.endTime.difference(task.startTime);
     final options = task.notificationTimerOptions;
 
     // Helper to add a notification time if it's valid (after now, before endTime)
@@ -327,6 +326,7 @@ class NotificationService {
         'NotificationService: Web - Scheduled ${times.length} timers for "${task.title}"');
   }
 
+  // ignore: unused_element
   void _scheduleWebTimer(Task task, DateTime now) {
     // Cancel existing timer
     _webTaskTimers[task.id]?.cancel();

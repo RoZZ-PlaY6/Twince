@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../models/recurring_task.dart';
 import '../models/task.dart';
+import 'backup_library.dart';
 import 'import_service.dart';
 import 'storage_service.dart';
 
@@ -74,8 +77,11 @@ class ImportService {
       await storage.generateRecurringInstances();
       await storage.reconcile();
 
-      return ImportResult(ImportStatus.success,
-          tasksImported: tasksImported, recurringImported: recurringImported);
+      return ImportResult(
+        ImportStatus.success,
+        tasksImported: tasksImported,
+        recurringImported: recurringImported,
+      );
     } catch (e) {
       debugPrint('Import failed: $e');
       return const ImportResult(ImportStatus.invalidFormat);
@@ -84,24 +90,87 @@ class ImportService {
 
   Future<ImportResult> pickAndImport(StorageService storage) async {
     try {
-      final result = await _channel
-          .invokeMethod<String>('pickAndReadFile', <String, dynamic>{
-        'allowedExtensions': ['json'],
-        'mimeType': 'application/json',
-      });
-
-      if (result == null || result.isEmpty) {
-        return const ImportResult(ImportStatus.unavailable);
+      final picked =
+          Platform.isAndroid ? await _pickAndroid() : await _pickDesktop();
+      if (picked == null) return const ImportResult(ImportStatus.cancelled);
+      final imported = await importFromJson(storage, picked.content);
+      if (imported.status != ImportStatus.success) return imported;
+      String? backupName;
+      var backupWritable = false;
+      try {
+        final active = await BackupLibrary.instance.rememberImport(
+          suggestedName: picked.name,
+          contents: picked.content,
+          externalPath: picked.path,
+          sourceUri: picked.uri,
+        );
+        backupName = active.name;
+        backupWritable = active.canUpdate;
+      } catch (error) {
+        debugPrint('Imported data, but could not remember the file: $error');
       }
-
-      return await importFromJson(storage, result);
+      return ImportResult(
+        ImportStatus.success,
+        tasksImported: imported.tasksImported,
+        recurringImported: imported.recurringImported,
+        backupName: backupName,
+        backupWritable: backupWritable,
+      );
     } on PlatformException catch (e) {
+      if (e.code == 'CANCELLED') {
+        return const ImportResult(ImportStatus.cancelled);
+      }
       debugPrint('Platform exception during import: ${e.message}');
       return const ImportResult(ImportStatus.unavailable);
     } catch (e) {
       debugPrint('Import failed: $e');
       return const ImportResult(ImportStatus.invalidFormat);
     }
+  }
+
+  Future<_PickedBackup?> _pickAndroid() async {
+    final result = await _channel.invokeMethod<Object>(
+      'pickAndReadFile',
+      <String, dynamic>{
+        'allowedExtensions': ['json'],
+        'mimeType': 'application/json',
+      },
+    );
+    if (result is String && result.isNotEmpty) {
+      return _PickedBackup(content: result, name: 'twince_backup.json');
+    }
+    if (result is Map) {
+      final content = result['content'] as String?;
+      if (content == null || content.isEmpty) return null;
+      return _PickedBackup(
+        content: content,
+        name: result['name'] as String? ?? 'twince_backup.json',
+        uri: result['uri'] as String?,
+      );
+    }
+    return null;
+  }
+
+  Future<_PickedBackup?> _pickDesktop() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['json'],
+      withData: true,
+    );
+    final file = result?.files.singleOrNull;
+    if (file == null) return null;
+    final bytes = file.bytes;
+    final content = bytes != null && bytes.isNotEmpty
+        ? utf8.decode(bytes)
+        : file.path == null
+            ? null
+            : await File(file.path!).readAsString();
+    if (content == null || content.isEmpty) return null;
+    return _PickedBackup(
+      content: content,
+      name: file.name,
+      path: file.path,
+    );
   }
 
   Task _jsonToTask(Map<String, dynamic> json) {
@@ -170,4 +239,18 @@ class ImportService {
   AlarmSoundType _alarmSoundType(Object? value) =>
       AlarmSoundType.values.where((type) => type.name == value).firstOrNull ??
       AlarmSoundType.system;
+}
+
+class _PickedBackup {
+  const _PickedBackup({
+    required this.content,
+    required this.name,
+    this.path,
+    this.uri,
+  });
+
+  final String content;
+  final String name;
+  final String? path;
+  final String? uri;
 }

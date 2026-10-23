@@ -56,17 +56,45 @@ class MainActivity : FlutterActivity() {
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "twince/import")
             .setMethodCallHandler { call, result ->
-                if (call.method != "pickAndReadFile") {
-                    result.notImplemented()
-                    return@setMethodCallHandler
+                when (call.method) {
+                    "pickAndReadFile" -> {
+                        importResult = result
+                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            type = "application/json"
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/json"))
+                            addFlags(
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION,
+                            )
+                        }
+                        startActivityForResult(intent, 42)
+                    }
+                    "writeBackup" -> {
+                        val uriText = call.argument<String>("uri")
+                        val contents = call.argument<String>("contents")
+                        if (uriText.isNullOrBlank() || contents == null) {
+                            result.error("INVALID_BACKUP", "Backup destination is missing", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            val uri = Uri.parse(uriText)
+                            val stream = contentResolver.openOutputStream(uri, "wt")
+                            if (stream == null) {
+                                result.success(false)
+                            } else {
+                                stream.use {
+                                    it.write(contents.toByteArray(Charsets.UTF_8))
+                                }
+                                result.success(true)
+                            }
+                        } catch (error: Exception) {
+                            result.success(false)
+                        }
+                    }
+                    else -> result.notImplemented()
                 }
-                importResult = result
-                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                    type = "application/json"
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                    putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/json"))
-                }
-                startActivityForResult(intent, 42)
             }
 
         val alarmChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "twince/alarms")
@@ -180,9 +208,22 @@ class MainActivity : FlutterActivity() {
             if (result == null) return
             if (resultCode == Activity.RESULT_OK && data != null) {
                 data.data?.let { uri ->
+                    runCatching {
+                        contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                        )
+                    }
                     contentResolver.openInputStream(uri)?.use { inputStream ->
                         val content = inputStream.readBytes().decodeToString()
-                        result.success(content)
+                        result.success(
+                            mapOf(
+                                "content" to content,
+                                "uri" to uri.toString(),
+                                "name" to (displayName(uri) ?: "twince_backup.json"),
+                            ),
+                        )
                     } ?: result.error("READ_FAILED", "Failed to read file", null)
                 } ?: result.error("NO_URI", "No file selected", null)
             } else {

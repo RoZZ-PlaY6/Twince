@@ -84,25 +84,48 @@ class StorageService extends ChangeNotifier {
     await generateRecurringInstances();
   }
 
-  /// Updates an existing recurring task definition and regenerates instances
-  Future<void> updateRecurringTask(RecurringTask definition) async {
+  /// Removes a recurring definition and every occurrence, including history.
+  Future<void> deleteRecurringTask(String id) async {
+    await _recurringBox.delete(id);
+    final occurrences = getAllTasks()
+        .where((task) => task.recurringDefinitionId == id)
+        .toList();
+    for (final task in occurrences) {
+      await deleteTask(task.id);
+    }
+    notifyListeners();
+  }
+
+  /// Updates an existing recurring task definition and regenerates instances.
+  Future<void> updateRecurringTask(RecurringTask definition,
+      {bool applyToAllOccurrences = false}) async {
     if (!_recurringBox.containsKey(definition.id)) {
       throw StateError('Recurring task not found');
     }
     await _recurringBox.put(definition.id, definition);
-    await _propagateRecurringDefinition(definition);
+    await _propagateRecurringDefinition(definition,
+        applyToAllOccurrences: applyToAllOccurrences);
     await generateRecurringInstances();
   }
 
-  Future<void> _propagateRecurringDefinition(RecurringTask definition) async {
+  Future<void> _propagateRecurringDefinition(RecurringTask definition,
+      {required bool applyToAllOccurrences}) async {
     final now = DateTime.now();
     final occurrences = getAllTasks().where((task) =>
         task.recurringDefinitionId == definition.id &&
-        task.status == TaskStatus.pending &&
-        task.startTime.isAfter(now));
+        (applyToAllOccurrences ||
+            (task.status == TaskStatus.pending &&
+                task.startTime.isAfter(now))));
     for (final existing in occurrences) {
-      if (!definition.weekdays.contains(existing.targetDate.weekday)) {
-        await deleteTask(existing.id);
+      final first = definition.firstDate;
+      final day = existing.targetDate;
+      if (!definition.weekdays.contains(day.weekday) ||
+          DateTime(day.year, day.month, day.day)
+              .isBefore(DateTime(first.year, first.month, first.day))) {
+        if (existing.status == TaskStatus.pending &&
+            existing.startTime.isAfter(now)) {
+          await deleteTask(existing.id);
+        }
         continue;
       }
       final generated = definition.occurrenceOn(existing.targetDate);

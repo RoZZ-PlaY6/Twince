@@ -110,7 +110,7 @@ class RecurringTaskGroup {
   Task? get nextOccurrence {
     final now = DateTime.now();
     final futureOccurrences = occurrences
-        .where((t) => t.startTime.isAfter(DateTime.now()))
+        .where((t) => t.startTime.isAfter(now))
         .toList()
       ..sort((a, b) => a.startTime.compareTo(b.startTime));
     return futureOccurrences.isNotEmpty ? futureOccurrences.first : null;

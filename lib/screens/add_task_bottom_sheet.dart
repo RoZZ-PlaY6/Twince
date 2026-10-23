@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +7,7 @@ import '../models/task.dart';
 import '../models/recurring_task.dart';
 import '../services/storage_service.dart';
 import '../services/alarm_service.dart';
+import '../services/user_preferences_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/alarm_sound_picker.dart';
 import '../widgets/precise_time_picker.dart';
@@ -65,11 +67,17 @@ class AddTaskBottomSheet extends StatefulWidget {
     super.key,
     required this.storage,
     this.task,
+    this.editAll = false,
     this.initialAlarmEnabled = false,
+    this.templateDate,
+    this.onSaveTemplate,
   });
   final StorageService storage;
   final Task? task;
+  final bool editAll;
   final bool initialAlarmEnabled;
+  final DateTime? templateDate;
+  final Future<void> Function(Task task)? onSaveTemplate;
 
   @override
   State<AddTaskBottomSheet> createState() => _AddTaskBottomSheetState();
@@ -82,8 +90,8 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
   final _intervalController = TextEditingController(text: '60');
   final _customMessageController = TextEditingController();
   DateTime _date = DateTime.now();
-  DateTime _start = DateTime.now();
-  DateTime _end = DateTime.now().add(const Duration(hours: 1));
+  late DateTime _start;
+  late DateTime _end;
   TaskCategory _category = TaskCategory.etc;
   String _notificationSoundId = 'cyber_pulse';
   String? _customSystemSoundUri;
@@ -96,17 +104,32 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
   String _alarmSoundId = 'cyber_pulse';
   String? _alarmSoundUri;
 
-  // Track if we're editing a recurring task (not just an occurrence)
   RecurringTask? _editingRecurringTask;
 
-  bool get _retrying => widget.task?.status == TaskStatus.failed;
+  bool get _retrying =>
+      !widget.editAll &&
+      widget.onSaveTemplate == null &&
+      widget.task?.status == TaskStatus.failed;
 
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _start = DateTime(now.year, now.month, now.day, now.hour, now.minute);
+    _end = _start.add(const Duration(hours: 1));
     _isAlarm = widget.initialAlarmEnabled;
+    if (widget.templateDate != null) _date = widget.templateDate!;
     final task = widget.task;
-    if (task == null) return;
+    if (task == null) {
+      // New task: default the alarm tone to the user's last saved selection.
+      final last = UserPreferencesService.instance.getLastAlarmSound();
+      if (last != null) {
+        _alarmSoundType = last.type;
+        _alarmSoundId = last.soundId;
+        _alarmSoundUri = last.uri;
+      }
+      return;
+    }
     _title.text = task.title;
     _description.text = task.description;
     _category = task.category;
@@ -124,26 +147,31 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
     _alarmSoundId = task.alarmSoundId;
     _alarmSoundUri = task.alarmSoundUri;
 
-    // If this task was generated from a recurring definition, load the series.
-    if (task.recurringDefinitionId != null) {
-      _loadRecurringDefinition(task.recurringDefinitionId!);
-    }
-  }
-
-  Future<void> _loadRecurringDefinition(String recurringId) async {
-    try {
-      final recurringTask = widget.storage.getRecurringTaskById(recurringId);
-      if (recurringTask != null && mounted) {
-        setState(() {
-          _editingRecurringTask = recurringTask;
-          _recurring = true;
-          _weekdays
-            ..clear()
-            ..addAll(recurringTask.weekdays);
-        });
+    if (widget.editAll && task.recurringDefinitionId != null) {
+      final definition =
+          widget.storage.getRecurringTaskById(task.recurringDefinitionId!);
+      if (definition != null) {
+        _editingRecurringTask = definition;
+        _recurring = true;
+        _title.text = definition.title;
+        _description.text = definition.description;
+        _category = definition.category;
+        _date = definition.firstDate;
+        _start = definition.startTime;
+        _end = definition.endTime;
+        _intervalController.text =
+            definition.reminderIntervalMinutes.toString();
+        _customMessageController.text =
+            definition.customNotificationMessage ?? '';
+        _notificationSoundId = definition.notificationSoundId;
+        _customSystemSoundUri = definition.customSystemSoundUri;
+        _notificationTimerOptions = definition.notificationTimerOptions;
+        _isAlarm = definition.isAlarm;
+        _alarmSoundType = definition.alarmSoundType;
+        _alarmSoundId = definition.alarmSoundId;
+        _alarmSoundUri = definition.alarmSoundUri;
+        _weekdays.addAll(definition.weekdays);
       }
-    } catch (error) {
-      debugPrint('Could not load recurring definition: $error');
     }
   }
 
@@ -162,10 +190,20 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
     return end.isAfter(start) ? end : end.add(const Duration(days: 1));
   }
 
-  String _formatTime(DateTime value) => DateFormat('HH:mm:ss').format(value);
+  String _formatTime(DateTime value) => DateFormat('HH:mm').format(value);
+
+  Future<void> _rememberAlarmTone() =>
+      UserPreferencesService.instance.saveLastAlarmSound(SavedAlarmPreference(
+        type: _alarmSoundType,
+        soundId: _alarmSoundId,
+        uri: _alarmSoundUri,
+      ));
 
   String get _buttonText {
     if (_saving) return 'Saving…';
+    if (widget.onSaveTemplate != null) {
+      return widget.task == null ? 'Add to plan' : 'Save plan task';
+    }
     if (_retrying) return 'Retry task';
     if (widget.task == null) {
       return _recurring ? 'Create recurring task' : 'Create task';
@@ -191,16 +229,16 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Notification Timer Messages',
+          'Repeat interval',
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: Colors.white70,
-                fontWeight: FontWeight.w500,
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
               ),
         ),
         const SizedBox(height: 8),
         Text(
-          'Select when to receive notifications during the task timer.',
-          style: TextStyle(color: Colors.white54, fontSize: 12),
+          'Choose when reminders should appear during the task.',
+          style: const TextStyle(color: Colors.white60, fontSize: 12),
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -228,11 +266,11 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
                   : null,
               tooltip: option.description,
               showCheckmark: true,
-              selectedColor: AppTheme.cyan.withOpacity(0.3),
-              checkmarkColor: AppTheme.cyan,
+              selectedColor: AppTheme.purple.withValues(alpha: 0.45),
+              checkmarkColor: Colors.white,
               backgroundColor: isAvailable
-                  ? AppTheme.surface
-                  : AppTheme.surface.withOpacity(0.5),
+                  ? const Color(0xA8182A50)
+                  : const Color(0x66182A50),
               labelStyle: TextStyle(
                 color: isAvailable ? Colors.white : Colors.white38,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
@@ -241,13 +279,13 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
                 color: isAvailable
                     ? (isSelected
                         ? AppTheme.cyan
-                        : AppTheme.purple.withOpacity(0.5))
+                        : AppTheme.cyan.withValues(alpha: 0.32))
                     : Colors.white24,
               ),
             );
           }).toList(),
         ),
-        if (!_notificationTimerOptions.isEmpty) ...[
+        if (_notificationTimerOptions.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
             'Selected: ${_notificationTimerOptions.map((o) => o.label).join(', ')}',
@@ -284,7 +322,8 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
       selectedStartTime: _start,
       selectedEndTime: _end,
       now: now,
-      adjustPassedAlarm: _isAlarm,
+      adjustPassedAlarm:
+          _isAlarm && !widget.editAll && widget.onSaveTemplate == null,
     );
     if (_retrying && !schedule.startTime.isAfter(now)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -292,20 +331,27 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
       );
       return;
     }
-    if (widget.task != null && !schedule.endTime.isAfter(now)) {
+    if (widget.task != null &&
+        widget.onSaveTemplate == null &&
+        !widget.editAll &&
+        !schedule.endTime.isAfter(now)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Choose a future end time.')),
       );
       return;
     }
     if (_isAlarm &&
+        widget.onSaveTemplate == null &&
+        !widget.editAll &&
         schedule.endTime.isBefore(now.subtract(const Duration(seconds: 30)))) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Alarm time must be in the future.')),
       );
       return;
     }
-    if (_isAlarm && !await AlarmService.instance.canScheduleExactAlarms()) {
+    if (_isAlarm &&
+        !kIsWeb &&
+        !await AlarmService.instance.canScheduleExactAlarms()) {
       await AlarmService.instance.requestExactAlarmAccess();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -327,7 +373,27 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
       final customMessage = _customMessageController.text.trim().isEmpty
           ? null
           : _customMessageController.text.trim();
-      if (existing == null) {
+      if (widget.onSaveTemplate != null) {
+        await widget.onSaveTemplate!(Task(
+          id: existing?.id,
+          title: _title.text,
+          description: _description.text.trim(),
+          category: _category,
+          targetDate: date,
+          startTime: start,
+          endTime: end,
+          reminderIntervalMinutes: interval,
+          createdAt: existing?.createdAt,
+          customNotificationMessage: customMessage,
+          notificationSoundId: _notificationSoundId,
+          customSystemSoundUri: _customSystemSoundUri,
+          notificationTimerOptions: _notificationTimerOptions,
+          isAlarm: _isAlarm,
+          alarmSoundType: _alarmSoundType,
+          alarmSoundId: _alarmSoundId,
+          alarmSoundUri: _alarmSoundUri,
+        ));
+      } else if (existing == null) {
         if (_recurring) {
           if (_weekdays.isEmpty) {
             throw ArgumentError('Select at least one weekday');
@@ -369,6 +435,7 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
             alarmSoundUri: _alarmSoundUri,
           ));
         }
+        if (_isAlarm) await _rememberAlarmTone();
       } else {
         // Check if we're editing a recurring task definition
         if (_editingRecurringTask != null && _recurring) {
@@ -396,7 +463,8 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
             createdAt: _editingRecurringTask!.createdAt,
             generatedThrough: _editingRecurringTask!.generatedThrough,
           );
-          await widget.storage.updateRecurringTask(updatedRecurring);
+          await widget.storage.updateRecurringTask(updatedRecurring,
+              applyToAllOccurrences: widget.editAll);
         } else {
           final edited = existing.copyWith(
             title: _title.text,
@@ -434,250 +502,583 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          18,
-          20,
-          MediaQuery.viewInsetsOf(context).bottom + 20,
+  InputDecoration _neonInput(
+    String label, {
+    String? hint,
+    IconData? icon,
+  }) =>
+      InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon:
+            icon == null ? null : Icon(icon, color: AppTheme.purple, size: 21),
+        filled: true,
+        fillColor: const Color(0xB5122344),
+        labelStyle: const TextStyle(color: Colors.white70),
+        hintStyle: const TextStyle(color: Colors.white38),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(
+            color: AppTheme.blue.withValues(alpha: 0.65),
+            width: 1.1,
+          ),
         ),
-        child: SafeArea(
-          child: Form(
-            key: _form,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    _retrying
-                        ? 'Retry / Reschedule'
-                        : widget.task == null
-                            ? 'New task'
-                            : 'Edit task',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 18),
-                  TextFormField(
-                    controller: _title,
-                    decoration: const InputDecoration(labelText: 'Title'),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Title is required'
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _description,
-                    decoration: const InputDecoration(labelText: 'Description'),
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 12),
-                  SegmentedButton<TaskCategory>(
-                    segments: TaskCategory.values
-                        .map(
-                          (cat) => ButtonSegment<TaskCategory>(
-                            value: cat,
-                            label: Text(cat.label),
-                            icon: Icon(
-                              switch (cat) {
-                                TaskCategory.daily => Icons.today,
-                                TaskCategory.important => Icons.priority_high,
-                                TaskCategory.etc => Icons.more_horiz,
-                              },
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: AppTheme.cyan, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: AppTheme.failed),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: AppTheme.failed, width: 1.5),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF071126),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF0B1A3A), Color(0xFF070D22)],
+          ),
+        ),
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: Form(
+                  key: _form,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _GlassPanel(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 52,
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      AppTheme.cyan,
+                                      AppTheme.blue,
+                                      AppTheme.purple,
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppTheme.purple
+                                          .withValues(alpha: 0.5),
+                                      blurRadius: 18,
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  widget.task == null
+                                      ? Icons.add_rounded
+                                      : Icons.edit_rounded,
+                                  color: Colors.white,
+                                  size: 30,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _retrying
+                                          ? 'Retry Task'
+                                          : widget.task == null
+                                              ? 'Add Task'
+                                              : 'Edit Task',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall
+                                          ?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    const Text(
+                                      'Turn your goals into reality',
+                                      style: TextStyle(color: Colors.white54),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton.filled(
+                                tooltip: 'Close',
+                                onPressed: () => Navigator.of(context).pop(),
+                                style: IconButton.styleFrom(
+                                  backgroundColor:
+                                      Colors.white.withValues(alpha: 0.08),
+                                  foregroundColor: Colors.white70,
+                                ),
+                                icon: const Icon(Icons.close_rounded),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _title,
+                          decoration: _neonInput(
+                            'Task Title',
+                            icon: Icons.edit_outlined,
+                          ),
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                                  ? 'Title is required'
+                                  : null,
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          controller: _description,
+                          decoration: _neonInput(
+                            'Description (Optional)',
+                            icon: Icons.description_outlined,
+                          ),
+                          maxLines: 3,
+                        ),
+                        const SizedBox(height: 14),
+                        SegmentedButton<TaskCategory>(
+                          style: ButtonStyle(
+                            backgroundColor:
+                                WidgetStateProperty.resolveWith((states) {
+                              if (states.contains(WidgetState.selected)) {
+                                return AppTheme.purple.withValues(alpha: 0.55);
+                              }
+                              return const Color(0xA814264B);
+                            }),
+                            foregroundColor:
+                                const WidgetStatePropertyAll(Colors.white),
+                            side: WidgetStateProperty.resolveWith((states) {
+                              final selected =
+                                  states.contains(WidgetState.selected);
+                              return BorderSide(
+                                color: selected
+                                    ? AppTheme.cyan
+                                    : AppTheme.blue.withValues(alpha: 0.35),
+                              );
+                            }),
+                          ),
+                          segments: TaskCategory.values
+                              .map(
+                                (cat) => ButtonSegment<TaskCategory>(
+                                  value: cat,
+                                  label: Text(cat.label),
+                                  icon: Icon(
+                                    switch (cat) {
+                                      TaskCategory.daily => Icons.today_rounded,
+                                      TaskCategory.important =>
+                                        Icons.priority_high_rounded,
+                                      TaskCategory.etc =>
+                                        Icons.more_horiz_rounded,
+                                    },
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          selected: {_category},
+                          onSelectionChanged: (selection) =>
+                              setState(() => _category = selection.first),
+                          multiSelectionEnabled: false,
+                          showSelectedIcon: false,
+                        ),
+                        const SizedBox(height: 16),
+                        _GlassPanel(
+                          child: Column(
+                            children: [
+                              if (widget.onSaveTemplate == null)
+                                SwitchTheme(
+                                  data: SwitchTheme.of(context).copyWith(
+                                    thumbColor: WidgetStateProperty.resolveWith(
+                                        (states) => Colors.white),
+                                    trackColor: WidgetStateProperty.resolveWith(
+                                      (states) =>
+                                          states.contains(WidgetState.selected)
+                                              ? AppTheme.purple
+                                              : const Color(0xFF26375E),
+                                    ),
+                                  ),
+                                  child: SwitchListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    title: const Text(
+                                      'Recurring task',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w700),
+                                    ),
+                                    subtitle: const Text(
+                                      'Repeat on selected weekdays',
+                                      style: TextStyle(color: Colors.white54),
+                                    ),
+                                    value: _recurring,
+                                    onChanged: _retrying ||
+                                            widget.task
+                                                    ?.recurringDefinitionId !=
+                                                null
+                                        ? null
+                                        : (value) => setState(() {
+                                              _recurring = value;
+                                              if (value && _weekdays.isEmpty) {
+                                                _weekdays.add(
+                                                    DateTime.now().weekday);
+                                              }
+                                            }),
+                                  ),
+                                ),
+                              if (_recurring) ...[
+                                const Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Days of the week',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Wrap(
+                                    spacing: 7,
+                                    runSpacing: 7,
+                                    children: [
+                                      for (var day = 1; day <= 7; day++)
+                                        FilterChip(
+                                          key: ValueKey('weekday-$day'),
+                                          label: Text(const [
+                                            'Mon',
+                                            'Tue',
+                                            'Wed',
+                                            'Thu',
+                                            'Fri',
+                                            'Sat',
+                                            'Sun'
+                                          ][day - 1]),
+                                          selected: _weekdays.contains(day),
+                                          selectedColor: AppTheme.purple
+                                              .withValues(alpha: 0.52),
+                                          side: BorderSide(
+                                            color: _weekdays.contains(day)
+                                                ? AppTheme.cyan
+                                                : AppTheme.blue
+                                                    .withValues(alpha: 0.3),
+                                          ),
+                                          onSelected: _retrying
+                                              ? null
+                                              : (selected) => setState(() {
+                                                    if (selected) {
+                                                      _weekdays.add(day);
+                                                    } else {
+                                                      _weekdays.remove(day);
+                                                    }
+                                                  }),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 12),
+                              if (widget.onSaveTemplate == null)
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    style: _neonButtonStyle(),
+                                    icon: const Icon(
+                                        Icons.calendar_month_rounded),
+                                    label: Text(
+                                      'Date: ${DateFormat.yMMMd().format(_date)}',
+                                    ),
+                                    onPressed: () async {
+                                      final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate: _date,
+                                        firstDate: DateTime(2000),
+                                        lastDate: DateTime(2100),
+                                      );
+                                      if (picked != null) {
+                                        setState(() => _date = picked);
+                                      }
+                                    },
+                                  ),
+                                ),
+                              const SizedBox(height: 10),
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final startButton = OutlinedButton(
+                                    style: _neonButtonStyle(),
+                                    onPressed: () async {
+                                      final picked =
+                                          await showPreciseTimePicker(
+                                        context: context,
+                                        initialTime: _start,
+                                        label: 'Start time',
+                                      );
+                                      if (picked != null) {
+                                        setState(() => _start = picked);
+                                      }
+                                    },
+                                    child: Text('Start ${_formatTime(_start)}'),
+                                  );
+                                  final endButton = OutlinedButton(
+                                    style: _neonButtonStyle(),
+                                    onPressed: () async {
+                                      final picked =
+                                          await showPreciseTimePicker(
+                                        context: context,
+                                        initialTime: _end,
+                                        label: 'End time',
+                                      );
+                                      if (picked != null) {
+                                        setState(() => _end = picked);
+                                      }
+                                    },
+                                    child: Text('End ${_formatTime(_end)}'),
+                                  );
+                                  if (constraints.maxWidth < 410) {
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        startButton,
+                                        const SizedBox(height: 8),
+                                        endButton,
+                                      ],
+                                    );
+                                  }
+                                  return Row(
+                                    children: [
+                                      Expanded(child: startButton),
+                                      const SizedBox(width: 10),
+                                      Expanded(child: endButton),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _GlassPanel(
+                          child: Column(
+                            children: [
+                              SwitchTheme(
+                                data: SwitchTheme.of(context).copyWith(
+                                  thumbColor: const WidgetStatePropertyAll(
+                                      Colors.white),
+                                  trackColor: WidgetStateProperty.resolveWith(
+                                    (states) =>
+                                        states.contains(WidgetState.selected)
+                                            ? AppTheme.cyan
+                                            : const Color(0xFF26375E),
+                                  ),
+                                ),
+                                child: SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  secondary: Container(
+                                    width: 42,
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.purple
+                                          .withValues(alpha: 0.35),
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppTheme.purple
+                                              .withValues(alpha: 0.45),
+                                          blurRadius: 14,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                        Icons.notifications_active_rounded),
+                                  ),
+                                  title: const Text(
+                                    'Smart Alarm & Reminders',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w800),
+                                  ),
+                                  subtitle: Text(
+                                    _isAlarm
+                                        ? 'Exact alarm at task end'
+                                        : 'Never miss what matters',
+                                    style:
+                                        const TextStyle(color: Colors.white54),
+                                  ),
+                                  value: _isAlarm,
+                                  onChanged: (value) =>
+                                      setState(() => _isAlarm = value),
+                                ),
+                              ),
+                              if (_isAlarm) ...[
+                                const SizedBox(height: 10),
+                                AlarmSoundPicker(
+                                  type: _alarmSoundType,
+                                  soundId: _alarmSoundId,
+                                  soundUri: _alarmSoundUri,
+                                  onChanged: (type, id, uri) {
+                                    setState(() {
+                                      _alarmSoundType = type;
+                                      _alarmSoundId = id;
+                                      _alarmSoundUri = uri;
+                                    });
+                                    _rememberAlarmTone();
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                              TextFormField(
+                                controller: _intervalController,
+                                decoration: _neonInput(
+                                  'Reminder interval (minutes)',
+                                  hint: 'e.g. 30',
+                                  icon: Icons.timer_outlined,
+                                ),
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                validator: (value) {
+                                  final n = int.tryParse(value ?? '');
+                                  return n == null || n < 1
+                                      ? 'Enter a positive integer'
+                                      : null;
+                                },
+                              ),
+                              const SizedBox(height: 14),
+                              TextFormField(
+                                controller: _customMessageController,
+                                decoration: _neonInput(
+                                  'Custom notification message',
+                                  hint:
+                                      'Optional: enter a custom reminder message',
+                                  icon: Icons.message_outlined,
+                                ),
+                                maxLines: 3,
+                                maxLength: 200,
+                                validator: (value) {
+                                  final trimmed = value?.trim() ?? '';
+                                  if (trimmed.length > 200) {
+                                    return 'Message must be 200 characters or less';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 4),
+                              _buildNotificationTimerOptions(),
+                              const SizedBox(height: 16),
+                              SoundPickerField(
+                                label: 'Notification Sound',
+                                selectedSoundId: _notificationSoundId,
+                                customSystemSoundUri: _customSystemSoundUri,
+                                hintText: 'Select a notification sound',
+                                onChanged: (value) => setState(
+                                    () => _notificationSoundId = value),
+                                onPickSystemSound: _pickSystemSound,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Container(
+                          height: 58,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                AppTheme.purple,
+                                AppTheme.blue,
+                                AppTheme.cyan,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(30),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.purple.withValues(alpha: 0.42),
+                                blurRadius: 22,
+                              ),
+                            ],
+                          ),
+                          child: FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+                            onPressed: _saving ? null : _save,
+                            icon: const Icon(Icons.add_rounded),
+                            label: Text(
+                              _buttonText,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
-                        )
-                        .toList(),
-                    selected: {_category},
-                    onSelectionChanged: (selection) =>
-                        setState(() => _category = selection.first),
-                    multiSelectionEnabled: false,
-                    showSelectedIcon: false,
-                  ),
-                  const SizedBox(height: 12),
-                  SwitchListTile(
-                    title: const Text('Recurring task'),
-                    subtitle: const Text('Repeat on selected weekdays'),
-                    value: _recurring,
-                    onChanged: _retrying
-                        ? null
-                        : (value) => setState(() {
-                              _recurring = value;
-                              if (value && _weekdays.isEmpty) {
-                                _weekdays.add(DateTime.now().weekday);
-                              }
-                            }),
-                  ),
-                  if (_recurring) ...[
-                    const Text('Days of the week'),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 7,
-                      runSpacing: 3,
-                      children: [
-                        for (var day = 1; day <= 7; day++)
-                          FilterChip(
-                            key: ValueKey('weekday-$day'),
-                            label: Text(const [
-                              'Mon',
-                              'Tue',
-                              'Wed',
-                              'Thu',
-                              'Fri',
-                              'Sat',
-                              'Sun'
-                            ][day - 1]),
-                            selected: _weekdays.contains(day),
-                            onSelected: _retrying
-                                ? null
-                                : (selected) => setState(() {
-                                      if (selected) {
-                                        _weekdays.add(day);
-                                      } else {
-                                        _weekdays.remove(day);
-                                      }
-                                    }),
-                          ),
+                        ),
                       ],
                     ),
-                  ],
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.calendar_today_outlined),
-                    label: Text('Date: ${DateFormat.yMMMd().format(_date)}'),
-                    onPressed: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _date,
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) setState(() => _date = picked);
-                    },
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () async {
-                            final picked = await showPreciseTimePicker(
-                              context: context,
-                              initialTime: _start,
-                              label: 'Start time',
-                            );
-                            if (picked != null) {
-                              setState(() => _start = picked);
-                            }
-                          },
-                          child: Text('Start ${_formatTime(_start)}'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () async {
-                            final picked = await showPreciseTimePicker(
-                              context: context,
-                              initialTime: _end,
-                              label: 'End time',
-                            );
-                            if (picked != null) setState(() => _end = picked);
-                          },
-                          child: Text('End ${_formatTime(_end)}'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Alarm'),
-                    subtitle: Text(
-                      _isAlarm
-                          ? 'Rings exactly at the task start time'
-                          : 'No full-screen alarm',
-                    ),
-                    secondary: const Icon(Icons.alarm, color: AppTheme.cyan),
-                    value: _isAlarm,
-                    onChanged: (value) => setState(() => _isAlarm = value),
-                  ),
-                  if (_isAlarm) ...[
-                    const SizedBox(height: 8),
-                    AlarmSoundPicker(
-                      type: _alarmSoundType,
-                      soundId: _alarmSoundId,
-                      soundUri: _alarmSoundUri,
-                      onChanged: (type, id, uri) => setState(() {
-                        _alarmSoundType = type;
-                        _alarmSoundId = id;
-                        _alarmSoundUri = uri;
-                      }),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  TextFormField(
-                    controller: _intervalController,
-                    decoration: const InputDecoration(
-                      labelText: 'Reminder interval (minutes)',
-                      hintText: 'e.g. 30',
-                      border: OutlineInputBorder(),
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
-                    validator: (value) {
-                      final n = int.tryParse(value ?? '');
-                      return n == null || n < 1
-                          ? 'Enter a positive integer'
-                          : null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _customMessageController,
-                    decoration: const InputDecoration(
-                      labelText: 'Custom notification message',
-                      hintText: 'Optional: enter a custom reminder message',
-                      border: OutlineInputBorder(),
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    ),
-                    maxLines: 3,
-                    maxLength: 200,
-                    validator: (value) {
-                      final trimmed = value?.trim() ?? '';
-                      if (trimmed.length > 200) {
-                        return 'Message must be 200 characters or less';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  _buildNotificationTimerOptions(),
-                  const SizedBox(height: 16),
-                  SoundPickerField(
-                    label: 'Notification Sound',
-                    selectedSoundId: _notificationSoundId,
-                    customSystemSoundUri: _customSystemSoundUri,
-                    hintText: 'Select a notification sound',
-                    onChanged: (value) =>
-                        setState(() => _notificationSoundId = value),
-                    onPickSystemSound: _pickSystemSound,
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: _saving ? null : _save,
-                    child: Text(_buttonText),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
         ),
+      );
+
+  ButtonStyle _neonButtonStyle() => OutlinedButton.styleFrom(
+        foregroundColor: AppTheme.purple,
+        backgroundColor: const Color(0xA814264B),
+        side: BorderSide(color: AppTheme.blue.withValues(alpha: 0.65)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+      );
+}
+
+class _GlassPanel extends StatelessWidget {
+  const _GlassPanel({
+    required this.child,
+    this.padding = const EdgeInsets.all(16),
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: padding,
+        decoration: BoxDecoration(
+          color: const Color(0xB20B1B3A),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: AppTheme.blue.withValues(alpha: 0.48),
+            width: 1.1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.purple.withValues(alpha: 0.14),
+              blurRadius: 22,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: child,
       );
 }
