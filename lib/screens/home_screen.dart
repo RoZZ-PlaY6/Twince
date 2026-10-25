@@ -34,6 +34,17 @@ List<Task> activeAlarmedTasks(List<Task> tasks, {DateTime? now}) {
 List<Task> standardTasksByStatus(List<Task> tasks, TaskStatus status) =>
     tasks.where((task) => task.status == status).toList();
 
+/// Web icon subsets omit Material Symbols above U+FFFF, so those navigation
+/// glyphs draw on Android and stay blank in a web build. The BMP code point is
+/// the same symbol.
+@visibleForTesting
+IconData navigationIconForPlatform(IconData icon, {required bool web}) {
+  if (!web || icon.codePoint <= 0xFFFF) return icon;
+  if (icon.codePoint == Icons.settings_rounded.codePoint) return Icons.settings;
+  if (icon.codePoint == Icons.task_alt_rounded.codePoint) return Icons.task_alt;
+  return icon;
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -338,7 +349,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     : null,
               ),
               child: Icon(
-                selected ? selectedIcon : icon,
+                navigationIconForPlatform(
+                  selected ? selectedIcon : icon,
+                  web: kIsWeb,
+                ),
                 size: 20,
                 color: selected ? Colors.white : Colors.white70,
               ),
