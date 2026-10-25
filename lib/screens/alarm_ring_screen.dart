@@ -234,11 +234,14 @@ class _BellPainter extends CustomPainter {
       ).createShader(Offset.zero & size);
     final bell = Path()
       ..moveTo(center.dx - 14, center.dy - 8)
-      ..quadraticBezierTo(center.dx, center.dy - 26, center.dx + 14, center.dy - 8)
+      ..quadraticBezierTo(
+          center.dx, center.dy - 26, center.dx + 14, center.dy - 8)
       ..lineTo(center.dx + 20, center.dy + 12)
-      ..quadraticBezierTo(center.dx + 22, center.dy + 20, center.dx + 12, center.dy + 20)
+      ..quadraticBezierTo(
+          center.dx + 22, center.dy + 20, center.dx + 12, center.dy + 20)
       ..lineTo(center.dx - 12, center.dy + 20)
-      ..quadraticBezierTo(center.dx - 22, center.dy + 20, center.dx - 20, center.dy + 12)
+      ..quadraticBezierTo(
+          center.dx - 22, center.dy + 20, center.dx - 20, center.dy + 12)
       ..close();
     canvas.drawPath(bell, stroke);
     canvas.drawCircle(Offset(center.dx, center.dy - 20), 2.4, stroke);

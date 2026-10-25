@@ -8,12 +8,21 @@ import '../services/import_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import 'backup_dialogs.dart';
+import 'material_icon.dart';
 
 class ExportBackupButton extends StatefulWidget {
-  const ExportBackupButton({super.key});
+  const ExportBackupButton({super.key, this.includeExport = true});
+
+  /// The header control can include Export Data. Bottom navigation never does.
+  final bool includeExport;
 
   @override
   State<ExportBackupButton> createState() => _ExportBackupButtonState();
+}
+
+/// Opens the existing Import / Backup sheet. This is not the Export Data action.
+Future<void> openImportBackup(BuildContext context) {
+  return _BackupActions(context).openManager();
 }
 
 class _ExportBackupButtonState extends State<ExportBackupButton> {
@@ -88,7 +97,57 @@ class _ExportBackupButtonState extends State<ExportBackupButton> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _openBackup() async {
+  Future<void> _openBackup() {
+    return _BackupActions(
+      context,
+      onImporting: (value) {
+        if (mounted) setState(() => _importing = value);
+      },
+    ).openManager();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final importButton = IconButton(
+      tooltip: 'Import Backup / بازیابی',
+      onPressed: _importing || _exporting ? null : _openBackup,
+      icon: _importing
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const MaterialIcon(Icons.restore_outlined, color: AppTheme.cyan),
+    );
+    if (!widget.includeExport) return importButton;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        importButton,
+        const SizedBox(width: 8),
+        IconButton(
+          tooltip: 'پشتیبان‌گیری / Export Data',
+          onPressed: _exporting || _importing ? null : _export,
+          icon: _exporting
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const MaterialIcon(Icons.backup_outlined, color: AppTheme.cyan),
+        ),
+      ],
+    );
+  }
+}
+
+class _BackupActions {
+  _BackupActions(this.context, {this.onImporting});
+
+  final BuildContext context;
+  final ValueChanged<bool>? onImporting;
+
+  Future<void> openManager() async {
     await showBackupManagerSheet(
       context,
       onImport: _import,
@@ -118,12 +177,11 @@ class _ExportBackupButtonState extends State<ExportBackupButton> {
   }
 
   Future<void> _import() async {
-    if (_importing) return;
-    setState(() => _importing = true);
+    onImporting?.call(true);
     try {
       final result = await ImportService.instance
           .pickAndImport(context.read<StorageService>());
-      if (!mounted || result.status == ImportStatus.cancelled) return;
+      if (!context.mounted || result.status == ImportStatus.cancelled) return;
       final message = switch (result.status) {
         ImportStatus.success => result.backupWritable
             ? 'Restored ${result.backupName}. Later saves can update this file.'
@@ -137,43 +195,53 @@ class _ExportBackupButtonState extends State<ExportBackupButton> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(message)));
     } catch (error) {
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('بازیابی انجام نشد.')),
         );
       }
     } finally {
-      if (mounted) setState(() => _importing = false);
+      onImporting?.call(false);
     }
   }
 
-  @override
-  Widget build(BuildContext context) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            tooltip: 'Import Backup / بازیابی',
-            onPressed: _importing || _exporting ? null : _openBackup,
-            icon: _importing
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.restore_outlined, color: AppTheme.cyan),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            tooltip: 'پشتیبان‌گیری / Export Data',
-            onPressed: _exporting || _importing ? null : _export,
-            icon: _exporting
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.backup_outlined, color: AppTheme.cyan),
-          ),
-        ],
-      );
+  Future<void> _saveCurrent(String contents) async {
+    final saved = await BackupLibrary.instance.saveCurrent(contents);
+    if (!context.mounted) return;
+    _message(
+      saved.saved
+          ? 'Updated ${saved.name}.'
+          : 'Could not update the original backup. Write access may be unavailable or expired. Import the file again or create a new backup.',
+    );
+  }
+
+  Future<void> _createNew(String contents) async {
+    final requested = await showBackupNameDialog(
+      context,
+      initialName: timestampedBackupName(DateTime.now()),
+      title: 'New backup file',
+      action: 'Create',
+    );
+    if (requested == null || !context.mounted) return;
+    final created = await BackupLibrary.instance.createNew(
+      name: requested,
+      contents: contents,
+    );
+    final shared =
+        await ExportService.instance.shareExisting(created.path, created.name);
+    if (!context.mounted) return;
+    _message(switch (shared.status) {
+      ExportStatus.shared => 'Created ${created.name}.',
+      ExportStatus.noData => 'No data to back up.',
+      ExportStatus.unavailable => created.path == null
+          ? 'This platform cannot write the backup file.'
+          : 'Saved ${created.name}. Sharing is unavailable here.',
+    });
+  }
+
+  void _message(String message) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
 }

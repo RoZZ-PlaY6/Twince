@@ -19,6 +19,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.provider.Settings
+import android.util.Log
 import androidx.core.app.NotificationCompat
 
 class AlarmRingingService : Service() {
@@ -29,26 +30,56 @@ class AlarmRingingService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var vibrator: Vibrator? = null
     private var audioFocusRequest: AudioFocusRequest? = null
+    // Track the last triggered task ID to prevent duplicate processing
+    // when the same alarm intent is delivered more than once.
+    private var lastTriggeredTaskId: String? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             val requested = intent.getStringExtra(AlarmData.EXTRA_TASK_ID) ?: audibleId
-            if (requested != null) stopAlarm(requested)
+            if (requested != null) {
+                Log.d(TAG, "Alarm stop requested for task $requested")
+                stopAlarm(requested)
+            }
             return START_NOT_STICKY
         }
         val data = intent?.let(AlarmData::fromIntent) ?: return START_NOT_STICKY
+
+        // Prevent duplicate processing when the same alarm intent
+        // is delivered more than once.
+        if (data.taskId == lastTriggeredTaskId && queue.containsKey(data.taskId)) {
+            Log.d(TAG, "Duplicate alarm intent ignored for task ${data.taskId}")
+            return START_NOT_STICKY
+        }
+        lastTriggeredTaskId = data.taskId
+
+        Log.d(TAG, "=== Alarm ringing started ===")
+        Log.d(TAG, "Task ID: ${data.taskId}")
+        Log.d(TAG, "Task title: ${data.title}")
+        Log.d(TAG, "Trigger time: ${data.triggerAtMillis}")
+        Log.d(TAG, "Sound type: ${data.soundType}, Sound ID: ${data.soundId}")
+        Log.d(TAG, "Sound URI: ${data.soundUri}")
+
         queue[data.taskId] = data
         audibleId = data.taskId
         createChannel()
         acquireWakeLock()
-        publishNotifications(offerFullScreen = true)
         startSound(data)
         startVibration()
-        if (AlarmActivity.isVisible) {
+
+        // Always try to launch the full-screen alarm Activity directly
+        // when the device allows it (locked screen, not interactive).
+        // This is more reliable than depending solely on the
+        // notification's setFullScreenIntent on some OEM devices.
+        if (shouldOpenFullScreen()) {
+            Log.d(TAG, "Launching full-screen AlarmActivity directly")
             startActivity(activityIntent(data))
         }
+
+        publishNotifications(offerFullScreen = true)
+        Log.d(TAG, "Alarm ringing fully initialized for task ${data.taskId}")
         return START_NOT_STICKY
     }
 
@@ -126,7 +157,11 @@ class AlarmRingingService : Service() {
     private fun shouldOpenFullScreen(): Boolean {
         val power = getSystemService(PowerManager::class.java)
         val keyguard = getSystemService(KeyguardManager::class.java)
+        // When the screen is on and the keyguard is not locked, the user
+        // is actively using the phone. Don't force a full-screen alarm;
+        // show a high-priority notification instead.
         if (power.isInteractive && !keyguard.isKeyguardLocked) return false
+        // Android 14+ requires explicit full-screen intent permission.
         if (Build.VERSION.SDK_INT >= 34) {
             val manager = getSystemService(NotificationManager::class.java)
             if (!manager.canUseFullScreenIntent()) return false
@@ -212,15 +247,36 @@ class AlarmRingingService : Service() {
         val uri = when (data.soundType) {
             "builtIn" -> {
                 val resource = resources.getIdentifier(data.soundId, "raw", packageName)
-                if (resource != 0) Uri.parse("android.resource://$packageName/$resource")
-                else Settings.System.DEFAULT_ALARM_ALERT_URI
+                if (resource != 0) {
+                    Uri.parse("android.resource://$packageName/$resource")
+                } else {
+                    Log.w(TAG, "Built-in sound resource not found: ${data.soundId}")
+                    Settings.System.DEFAULT_ALARM_ALERT_URI
+                }
             }
-            "customFile" -> data.soundUri?.let(Uri::parse)
-            "system" -> data.soundUri?.let(Uri::parse)
+            "customFile" -> {
+                data.soundUri?.let { uri ->
+                    Log.d(TAG, "Playing custom file: $uri")
+                    Uri.parse(uri)
+                }
+            }
+            "system" -> {
+                // system type may have a persisted URI from the system picker,
+                // otherwise fall back to the default alarm alert URI.
+                data.soundUri?.let { uri ->
+                    Log.d(TAG, "Playing system sound URI: $uri")
+                    Uri.parse(uri)
+                } ?: Settings.System.DEFAULT_ALARM_ALERT_URI
+            }
             else -> null
         } ?: Settings.System.DEFAULT_ALARM_ALERT_URI
+
+        Log.d(TAG, "Starting sound playback: $uri")
         player = runCatching { createPlayer(uri) }
-            .getOrElse { createPlayer(Settings.System.DEFAULT_ALARM_ALERT_URI) }
+            .getOrElse { failure ->
+                Log.e(TAG, "Sound playback failed for $uri: ${failure.exception?.message}", failure.exception)
+                createPlayer(Settings.System.DEFAULT_ALARM_ALERT_URI)
+            }
     }
 
     private fun createPlayer(uri: Uri): MediaPlayer =
@@ -313,6 +369,7 @@ class AlarmRingingService : Service() {
         const val EXTRA_NEXT_ALARM = "nextAlarm"
         private const val CHANNEL_ID = "twince_ringing_alarms_v2"
         private const val FOREGROUND_ID = 0x41A2C
+        private const val TAG = "AlarmRingingService"
 
         fun notificationId(taskId: String): Int =
             (taskId.hashCode() xor 0x41A2C) and Int.MAX_VALUE
