@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../models/task.dart';
 import '../theme/app_theme.dart';
+import 'material_icon.dart';
 
 class TaskCard extends StatefulWidget {
   const TaskCard({
@@ -145,7 +146,8 @@ class _TaskCardState extends State<TaskCard> {
                 if (failed)
                   const Padding(
                     padding: EdgeInsets.only(top: 9, right: 12),
-                    child: Icon(Icons.close_rounded, color: AppTheme.failed),
+                    child: MaterialIcon(Icons.close_rounded,
+                        color: AppTheme.failed),
                   )
                 else
                   Checkbox(
@@ -210,7 +212,7 @@ class _TaskCardState extends State<TaskCard> {
                         tooltip: failed ? 'Retry / Reschedule' : 'Edit task',
                         visualDensity: VisualDensity.compact,
                         onPressed: widget.onEdit,
-                        icon: Icon(
+                        icon: MaterialIcon(
                             failed ? Icons.replay_rounded : Icons.edit_outlined,
                             color: failed ? AppTheme.purple : AppTheme.cyan),
                       ),
@@ -218,7 +220,7 @@ class _TaskCardState extends State<TaskCard> {
                       tooltip: 'Delete task',
                       visualDensity: VisualDensity.compact,
                       onPressed: widget.onDelete,
-                      icon: const Icon(Icons.delete_outline),
+                      icon: const MaterialIcon(Icons.delete_outline),
                     ),
                   ],
                 ),
