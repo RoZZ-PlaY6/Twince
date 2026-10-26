@@ -6,9 +6,11 @@ import 'package:provider/provider.dart';
 
 import '../models/task.dart';
 import '../services/browser_notification.dart';
+import '../services/export_service.dart';
 import '../services/notification_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/material_icon.dart';
 import '../widgets/task_card.dart';
 import '../widgets/test_notification_dialog.dart';
 import '../widgets/export_backup_button.dart';
@@ -33,17 +35,6 @@ List<Task> activeAlarmedTasks(List<Task> tasks, {DateTime? now}) {
 @visibleForTesting
 List<Task> standardTasksByStatus(List<Task> tasks, TaskStatus status) =>
     tasks.where((task) => task.status == status).toList();
-
-/// Web icon subsets omit Material Symbols above U+FFFF, so those navigation
-/// glyphs draw on Android and stay blank in a web build. The BMP code point is
-/// the same symbol.
-@visibleForTesting
-IconData navigationIconForPlatform(IconData icon, {required bool web}) {
-  if (!web || icon.codePoint <= 0xFFFF) return icon;
-  if (icon.codePoint == Icons.settings_rounded.codePoint) return Icons.settings;
-  if (icon.codePoint == Icons.task_alt_rounded.codePoint) return Icons.task_alt;
-  return icon;
-}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -74,9 +65,8 @@ class _HomeScreenState extends State<HomeScreen> {
               Consumer<StorageService>(
                 builder: (context, storage, _) {
                   final tasks = storage.getAllTasks();
-                  if (_destination == 4) return const PlanScreen();
                   if (_destination == 2) {
-                    return const AnalyticsScreen(embedded: true);
+                    return const PlanScreen();
                   }
                   if (_destination == 1) return const WeeklyTasksScreen();
                   if (_destination == 3) return const SettingsScreen();
@@ -89,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          floatingActionButton: _destination == 3 || _destination == 2
+          floatingActionButton: _destination == 3
               ? null
               : Container(
                   decoration: BoxDecoration(
@@ -113,22 +103,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: FloatingActionButton.extended(
                     elevation: 0,
                     backgroundColor: Colors.transparent,
-                    onPressed: () => _destination == 4
-                        ? showAddPlanFlow(context)
-                        : _destination == 1
-                            ? showWeeklyTaskSheet(context)
-                            : showModalBottomSheet<void>(
-                                context: context,
-                                isScrollControlled: true,
-                                showDragHandle: true,
-                                builder: (_) => AddTaskBottomSheet(
-                                  storage: context.read<StorageService>(),
-                                  initialAlarmEnabled: false,
-                                ),
-                              ),
-                    icon: const Icon(Icons.add_rounded),
+                    onPressed: () {
+                      if (_destination == 2) {
+                        showAddPlanFlow(context);
+                      } else if (_destination == 1) {
+                        showWeeklyTaskSheet(context);
+                      } else {
+                        showModalBottomSheet<void>(
+                          context: context,
+                          isScrollControlled: true,
+                          showDragHandle: true,
+                          builder: (_) => AddTaskBottomSheet(
+                            storage: context.read<StorageService>(),
+                            initialAlarmEnabled: false,
+                          ),
+                        );
+                      }
+                    },
+                    icon: const MaterialIcon(Icons.add_rounded),
                     label: Text(
-                      _destination == 4
+                      _destination == 2
                           ? 'Add Plan'
                           : _destination == 1
                               ? 'Add Weekly Task'
@@ -187,34 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         const Spacer(),
-                        IconButton(
-                          tooltip: 'Plan',
-                          visualDensity: VisualDensity.compact,
-                          icon: const Icon(Icons.event_note_outlined,
-                              color: AppTheme.cyan),
-                          onPressed: () => setState(() => _destination = 4),
-                        ),
-                        const ExportBackupButton(),
-                        IconButton(
-                          tooltip: 'History',
-                          visualDensity: VisualDensity.compact,
-                          icon: const Icon(Icons.history, color: AppTheme.cyan),
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                                builder: (_) => const HistoryScreen()),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Test notification',
-                          visualDensity: VisualDensity.compact,
-                          icon: const Icon(Icons.notifications_outlined,
-                              color: AppTheme.cyan),
-                          onPressed: () => showDialog<void>(
-                            context: context,
-                            builder: (_) => TestNotificationDialog(
-                                onSend: _sendTestNotification),
-                          ),
-                        ),
+                        ..._topActions(),
                         const SizedBox(width: 6),
                       ],
                     ),
@@ -285,49 +252,95 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              child: Row(
-                children: [
-                  _bottomItem(
-                    index: 3,
-                    label: 'Settings',
-                    icon: Icons.settings_outlined,
-                    selectedIcon: Icons.settings_rounded,
-                  ),
-                  _bottomItem(
-                    index: 0,
-                    label: 'Tasks',
-                    icon: Icons.task_alt_outlined,
-                    selectedIcon: Icons.task_alt_rounded,
-                  ),
-                  _bottomItem(
-                    index: 1,
-                    label: 'Weekly Tasks',
-                    icon: Icons.date_range_outlined,
-                    selectedIcon: Icons.date_range_rounded,
-                  ),
-                  _bottomItem(
-                    index: 2,
-                    label: 'Analytics',
-                    icon: Icons.insights_outlined,
-                    selectedIcon: Icons.insights_rounded,
-                  ),
-                ],
-              ),
+              child: Row(children: _bottomDestinations()),
             ),
           ),
         ),
       );
 
+  List<Widget> _topActions() => [
+        IconButton(
+          tooltip: 'Analytics',
+          visualDensity: VisualDensity.compact,
+          icon:
+              const MaterialIcon(Icons.insights_outlined, color: AppTheme.cyan),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+                builder: (_) => const AnalyticsScreen(embedded: false)),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Import Backup',
+          visualDensity: VisualDensity.compact,
+          icon:
+              const MaterialIcon(Icons.restore_outlined, color: AppTheme.cyan),
+          onPressed: () => openImportBackup(context),
+        ),
+        IconButton(
+          tooltip: 'Export Data',
+          visualDensity: VisualDensity.compact,
+          icon: const MaterialIcon(Icons.backup_outlined, color: AppTheme.cyan),
+          onPressed: _exportData,
+        ),
+        IconButton(
+          tooltip: 'History',
+          visualDensity: VisualDensity.compact,
+          icon: const MaterialIcon(Icons.history, color: AppTheme.cyan),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const HistoryScreen()),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Test notification',
+          visualDensity: VisualDensity.compact,
+          icon: const MaterialIcon(Icons.notifications_outlined,
+              color: AppTheme.cyan),
+          onPressed: () => showDialog<void>(
+            context: context,
+            builder: (_) =>
+                TestNotificationDialog(onSend: _sendTestNotification),
+          ),
+        ),
+      ];
+
+  List<Widget> _bottomDestinations() => [
+        _bottomItem(
+          index: 3,
+          label: 'Settings',
+          icon: Icons.settings_outlined,
+          selectedIcon: Icons.settings_rounded,
+        ),
+        _bottomItem(
+          index: 0,
+          label: 'Tasks',
+          icon: Icons.task_alt_outlined,
+          selectedIcon: Icons.task_alt_rounded,
+        ),
+        _bottomItem(
+          index: 1,
+          label: 'Weekly Tasks',
+          icon: Icons.date_range_outlined,
+          selectedIcon: Icons.date_range_rounded,
+        ),
+        _bottomItem(
+          index: 2,
+          label: 'Plan',
+          icon: Icons.event_note_outlined,
+          selectedIcon: Icons.event_note_rounded,
+        ),
+      ];
+
   Widget _bottomItem({
-    required int index,
+    int? index,
     required String label,
     required IconData icon,
     required IconData selectedIcon,
+    VoidCallback? onPressed,
   }) {
-    final selected = _destination == index;
+    final selected = index != null && _destination == index;
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => _destination = index),
+        onTap: onPressed ?? () => setState(() => _destination = index!),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -348,11 +361,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ? Border.all(color: AppTheme.purple.withValues(alpha: 0.5))
                     : null,
               ),
-              child: Icon(
-                navigationIconForPlatform(
-                  selected ? selectedIcon : icon,
-                  web: kIsWeb,
-                ),
+              child: MaterialIcon(
+                selected ? selectedIcon : icon,
                 size: 20,
                 color: selected ? Colors.white : Colors.white70,
               ),
@@ -482,7 +492,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: ExpansionTile(
             key: PageStorageKey(
                 'recurring-${status.name}-${group.definitionId}'),
-            leading: Icon(Icons.repeat_rounded, color: accent),
+            leading: MaterialIcon(Icons.repeat_rounded, color: accent),
             iconColor: accent,
             collapsedIconColor: accent,
             shape: const Border(),
@@ -503,7 +513,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       foregroundColor: accent,
                       padding: const EdgeInsets.symmetric(horizontal: 6),
                     ),
-                    icon: const Icon(Icons.edit_rounded, size: 18),
+                    icon: const MaterialIcon(Icons.edit_rounded, size: 18),
                     label: const Text('Edit all'),
                     onPressed: () => showModalBottomSheet<void>(
                       context: context,
@@ -518,12 +528,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 PopupMenuButton<String>(
                   tooltip: 'Recurring task actions',
-                  icon: const Icon(Icons.more_vert_rounded, size: 20),
+                  icon: const MaterialIcon(Icons.more_vert_rounded, size: 20),
                   itemBuilder: (_) => const [
                     PopupMenuItem(
                       value: 'deleteAll',
                       child: Row(children: [
-                        Icon(Icons.delete_outline_rounded, size: 18),
+                        MaterialIcon(Icons.delete_outline_rounded, size: 18),
                         SizedBox(width: 8),
                         Text('Delete all'),
                       ]),
@@ -589,6 +599,19 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<bool> _sendTestNotification(String title, String body) async {
     if (kIsWeb) return showBrowserNotification(title, body);
     return NotificationService.instance.showTest(title, body);
+  }
+
+  Future<void> _exportData() async {
+    final storage = context.read<StorageService>();
+    final result = await ExportService.instance.exportAndShare(storage);
+    if (!mounted) return;
+    final message = switch (result.status) {
+      ExportStatus.shared => 'Backup created and shared.',
+      ExportStatus.noData => 'No data to back up.',
+      ExportStatus.unavailable => 'Export is unavailable on this platform.',
+    };
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _perform(BuildContext context, Future<void> action) async {

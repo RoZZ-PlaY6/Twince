@@ -58,3 +58,9 @@ flutter:
           weight: 500
         - asset: assets/fonts/vazirmatn/Vazirmatn-Bold.ttf
           weight: 700
+    # Full icon font. The web tree-shaken MaterialIcons face is registered under
+    # a different family name than the glyphs' font, so icon characters draw as
+    # boxes. This family is not referenced by const IconData, so it is not subset.
+    - family: TwinceIcons
+      fonts:
+        - asset: assets/fonts/MaterialIcons-Regular.otf

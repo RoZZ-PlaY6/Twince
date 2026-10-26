@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../services/plan_export.dart';
 import '../services/plan_service.dart';
 import '../services/storage_service.dart';
-import 'add_task_bottom_sheet.dart';
 import '../theme/app_theme.dart';
+import 'add_task_bottom_sheet.dart';
 
 const _days = [
   'Monday',
@@ -107,6 +109,7 @@ class PlanScreen extends StatelessWidget {
                     Expanded(
                         child: Text(plan.name,
                             maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    PlanExportButton(plan: plan),
                     IconButton(
                       tooltip: 'Edit Plan',
                       icon: const Icon(Icons.edit_outlined, size: 20),
@@ -196,6 +199,95 @@ Future<bool> confirmDeletePlan(BuildContext context, String planName) async {
     ),
   );
   return confirmed == true;
+}
+
+class PlanExportButton extends StatefulWidget {
+  const PlanExportButton({super.key, required this.plan, this.copyText});
+
+  final PlanDefinition plan;
+  final Future<void> Function(String text)? copyText;
+
+  @override
+  State<PlanExportButton> createState() => _PlanExportButtonState();
+}
+
+class _PlanExportButtonState extends State<PlanExportButton> {
+  bool _busy = false;
+
+  Future<void> _copy() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final now = DateTime.now();
+      final document = buildPlanExport(
+        widget.plan,
+        exportedAt: now,
+        timeZoneOffset: now.timeZoneOffset,
+      );
+      final json = encodePlanExport(document);
+      final copy = widget.copyText ??
+          (String text) => Clipboard.setData(ClipboardData(text: text));
+      await copy(json);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Plan JSON copied to clipboard'),
+          action: SnackBarAction(
+            label: 'Preview',
+            onPressed: () => _showPreview(json),
+          ),
+        ),
+      );
+    } on PlanExportException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _showPreview(String json) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Plan JSON'),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(child: SelectableText(json)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final copy = widget.copyText ??
+                  (String text) => Clipboard.setData(ClipboardData(text: text));
+              await copy(json);
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+            },
+            child: const Text('Copy'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+        tooltip: 'Export JSON',
+        visualDensity: VisualDensity.compact,
+        onPressed: _busy ? null : _copy,
+        icon: _busy
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.share_outlined, size: 20),
+      );
 }
 
 String _entryLabel(PlanEntry entry, bool university) =>
