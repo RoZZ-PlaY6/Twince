@@ -136,10 +136,10 @@ class _BackupManagerSheet extends StatefulWidget {
 }
 
 class _BackupManagerSheetState extends State<_BackupManagerSheet> {
-  final _name = TextEditingController();
   ActiveBackup? _active;
   bool _loading = true;
   bool _saving = false;
+  String? _error;
 
   @override
   void initState() {
@@ -152,38 +152,40 @@ class _BackupManagerSheetState extends State<_BackupManagerSheet> {
     if (!mounted) return;
     setState(() {
       _active = active;
-      _name.text = active?.name ?? '';
       _loading = false;
     });
   }
 
   Future<void> _rename() async {
-    setState(() => _saving = true);
+    final active = _active;
+    if (active == null) {
+      setState(() => _error = 'There is no backup file to rename.');
+      return;
+    }
+    final requested = await showBackupNameDialog(
+      context,
+      initialName: active.name,
+      title: 'Rename backup file',
+      action: 'Rename',
+    );
+    if (requested == null || !mounted) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
-      final renamed = await BackupLibrary.instance.rename(_name.text);
+      final renamed = await BackupLibrary.instance.rename(requested);
       if (!mounted) return;
       setState(() => _active = renamed);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Active backup is now ${renamed.name}.')),
-      );
     } on BackupNameException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.message)));
+      setState(() => _error = error.message);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not rename the backup file.')),
-      );
+      setState(() => _error = 'Could not rename the backup file.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
-  }
-
-  @override
-  void dispose() {
-    _name.dispose();
-    super.dispose();
   }
 
   @override
@@ -245,22 +247,22 @@ class _BackupManagerSheetState extends State<_BackupManagerSheet> {
                               : 'Current backup: ${_active!.name}',
                           style: const TextStyle(color: Colors.white70),
                         ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _name,
-                          decoration: const InputDecoration(
-                            labelText: 'Backup file name',
-                          ),
-                        ),
                         const SizedBox(height: 14),
                         SizedBox(
                           height: 48,
                           child: FilledButton(
-                            onPressed:
-                                _saving || _active == null ? null : _rename,
-                            child: Text(_saving ? 'Saving…' : 'Rename'),
+                            onPressed: _saving ? null : _rename,
+                            child: Text(
+                                _saving ? 'Saving…' : 'Rename backup file'),
                           ),
                         ),
+                        if (_error != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            _error!,
+                            style: const TextStyle(color: Color(0xFFFFB4AB)),
+                          ),
+                        ],
                       ],
                     ),
             ),

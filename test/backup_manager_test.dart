@@ -21,7 +21,7 @@ void main() {
     expect(find.text('Save to current backup'), findsOneWidget);
     expect(find.text('Create new backup'), findsOneWidget);
     expect(find.text('Current backup: none'), findsOneWidget);
-    expect(find.text('Rename'), findsOneWidget);
+    expect(find.text('Rename backup file'), findsOneWidget);
     expect(
       find.text(
           'Import a backup or create one before saving to the current file.'),

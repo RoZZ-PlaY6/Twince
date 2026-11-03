@@ -8,8 +8,11 @@ import 'package:flutter/services.dart';
 import '../models/recurring_task.dart';
 import '../models/task.dart';
 import 'backup_library.dart';
+import 'backup_sections.dart';
 import 'import_service.dart';
+import 'plan_service.dart';
 import 'storage_service.dart';
+import 'weekly_task_service.dart';
 
 class ImportService {
   ImportService._();
@@ -17,7 +20,11 @@ class ImportService {
   static const _channel = MethodChannel('twince/import');
 
   Future<ImportResult> importFromJson(
-      StorageService storage, String jsonContent) async {
+    StorageService storage,
+    String jsonContent, {
+    WeeklyTaskService? weeklyTasks,
+    PlanService? plans,
+  }) async {
     Map<String, dynamic> payload;
     try {
       payload = jsonDecode(jsonContent) as Map<String, dynamic>;
@@ -76,6 +83,11 @@ class ImportService {
       // Regenerate recurring instances after import
       await storage.generateRecurringInstances();
       await storage.reconcile();
+      await restoreBackupSections(
+        payload,
+        weeklyTasks: weeklyTasks,
+        plans: plans,
+      );
 
       return ImportResult(
         ImportStatus.success,
@@ -88,12 +100,21 @@ class ImportService {
     }
   }
 
-  Future<ImportResult> pickAndImport(StorageService storage) async {
+  Future<ImportResult> pickAndImport(
+    StorageService storage, {
+    WeeklyTaskService? weeklyTasks,
+    PlanService? plans,
+  }) async {
     try {
       final picked =
           Platform.isAndroid ? await _pickAndroid() : await _pickDesktop();
       if (picked == null) return const ImportResult(ImportStatus.cancelled);
-      final imported = await importFromJson(storage, picked.content);
+      final imported = await importFromJson(
+        storage,
+        picked.content,
+        weeklyTasks: weeklyTasks,
+        plans: plans,
+      );
       if (imported.status != ImportStatus.success) return imported;
       String? backupName;
       var backupWritable = false;

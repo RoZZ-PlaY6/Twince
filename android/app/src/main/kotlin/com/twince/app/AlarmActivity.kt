@@ -29,6 +29,7 @@ import java.util.Locale
 class AlarmActivity : Activity() {
     private var data: AlarmData? = null
     private var root: FrameLayout? = null
+    private val typeface = Typeface.DEFAULT
 
     private val queueReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -101,9 +102,9 @@ class AlarmActivity : Activity() {
         super.onDestroy()
     }
 
-    @Deprecated("Back only closes this screen. It does not complete the task.")
+    @Deprecated("Back does not dismiss the alarm. Use Dismiss, Restart, or Snooze.")
     override fun onBackPressed() {
-        finish()
+        // Ignore back press during alarm ringing - user must take a deliberate action
     }
 
     private fun render() {

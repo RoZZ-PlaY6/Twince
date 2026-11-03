@@ -1,14 +1,18 @@
 import 'dart:io';
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:twince/models/task.dart';
 import 'package:twince/screens/home_screen.dart';
 import 'package:twince/services/storage_service.dart';
 import 'package:hive/hive.dart';
 import 'package:twince/services/weekly_task_service.dart';
+import 'package:twince/services/weekly_tasks_clipboard.dart';
+import 'package:twince/screens/weekly_tasks_screen.dart';
 
 class _TaskStore extends ChangeNotifier implements StorageService {
   _TaskStore(this.tasks);
@@ -85,6 +89,122 @@ void main() {
       await directory.delete(recursive: true);
     }
   });
+  test('clipboard format has one current-week count per line', () {
+    final tasks = [
+      WeeklyTask(
+          id: 'first',
+          title: 'Interview',
+          targetPerWeek: 8,
+          doneThisWeek: 4,
+          weekKey: weeklyKey(DateTime.now())),
+      WeeklyTask(
+          id: 'second',
+          title: 'Study\nplan',
+          targetPerWeek: 3,
+          doneThisWeek: 1,
+          weekKey: weeklyKey(DateTime.now())),
+    ];
+    expect(formatWeeklyTasks(tasks), 'Interview: 4 / 8\nStudy plan: 1 / 3');
+  });
+
+  testWidgets('copy button copies the current list and shows progress',
+      (tester) async {
+    final weekly = _WeeklyStore();
+    weekly.tasks.add(WeeklyTask(
+        id: 'interview',
+        title: 'Interview',
+        targetPerWeek: 8,
+        doneThisWeek: 4,
+        weekKey: weeklyKey(DateTime.now())));
+    final copying = Completer<void>();
+    String? copiedText;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copiedText =
+            (call.arguments as Map<Object?, Object?>)['text'] as String;
+        await copying.future;
+      }
+      return null;
+    });
+    addTearDown(() => TestDefaultBinaryMessengerBinding
+        .instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null));
+    await tester.pumpWidget(ChangeNotifierProvider<WeeklyTaskService>.value(
+      value: weekly,
+      child: const MaterialApp(home: Scaffold(body: WeeklyTasksScreen())),
+    ));
+    await tester.tap(find.text('Copy Tasks'));
+    await tester.pump();
+    expect(copiedText, 'Interview: 4 / 8');
+    expect(tester.widget<OutlinedButton>(find.byType(OutlinedButton)).onPressed,
+        isNull);
+    copying.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Copied to clipboard!'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+  for (final viewport in [
+    (const Size(390, 844), 34.0),
+    (const Size(360, 640), 24.0),
+    (const Size(320, 480), 24.0),
+  ]) {
+    testWidgets('last weekly card clears add button at ${viewport.$1}',
+        (tester) async {
+      tester.view.physicalSize = viewport.$1;
+      tester.view.devicePixelRatio = 1;
+      tester.view.padding = FakeViewPadding(top: 24, bottom: viewport.$2);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPadding);
+
+      final weekly = _WeeklyStore();
+      weekly.tasks.addAll([
+        for (var index = 0; index < 5; index++)
+          WeeklyTask(
+            id: 'weekly-$index',
+            title: index == 4 ? 'interview' : 'weekly goal $index',
+            targetPerWeek: 7,
+            weekKey: weeklyKey(DateTime.now()),
+          ),
+      ]);
+      await tester.pumpWidget(MultiProvider(
+        providers: [
+          ChangeNotifierProvider<StorageService>.value(value: _TaskStore([])),
+          ChangeNotifierProvider<WeeklyTaskService>.value(value: weekly),
+        ],
+        child: const MaterialApp(home: HomeScreen()),
+      ));
+      await tester.tap(find.text('Weekly Tasks'));
+      await tester.pumpAndSettle();
+      final scrollable = tester.state<ScrollableState>(find.descendant(
+          of: find.byType(ListView).first, matching: find.byType(Scrollable)));
+      for (var attempt = 0; attempt < 5; attempt++) {
+        scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        if (scrollable.position.extentAfter < 1) break;
+      }
+      expect(scrollable.position.extentAfter, lessThan(1));
+
+      final card = find
+          .ancestor(
+            of: find.text('interview'),
+            matching: find.byType(Container),
+          )
+          .first;
+      final button = find.byType(FloatingActionButton);
+      expect(tester.getRect(card).bottom,
+          lessThanOrEqualTo(tester.getRect(button).top - 8));
+      expect(tester.getRect(find.byTooltip('Increase interview')).bottom,
+          lessThan(tester.getRect(button).top));
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('Add Weekly Task'));
+      await tester.pumpAndSettle();
+      expect(find.text('Target per week'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
   testWidgets(
       'main Tasks includes alarms and Weekly Tasks opens its focused form',
       (tester) async {

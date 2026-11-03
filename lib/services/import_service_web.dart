@@ -10,15 +10,22 @@ import 'package:file_picker/file_picker.dart';
 import '../models/recurring_task.dart';
 import '../models/task.dart';
 import 'backup_library.dart';
+import 'backup_sections.dart';
 import 'import_service.dart';
+import 'plan_service.dart';
 import 'storage_service.dart';
+import 'weekly_task_service.dart';
 
 class ImportService {
   ImportService._();
   static final instance = ImportService._();
 
   Future<ImportResult> importFromJson(
-      StorageService storage, String jsonContent) async {
+    StorageService storage,
+    String jsonContent, {
+    WeeklyTaskService? weeklyTasks,
+    PlanService? plans,
+  }) async {
     Map<String, dynamic> payload;
     try {
       payload = jsonDecode(jsonContent) as Map<String, dynamic>;
@@ -77,6 +84,11 @@ class ImportService {
       // Regenerate recurring instances after import
       await storage.generateRecurringInstances();
       await storage.reconcile();
+      await restoreBackupSections(
+        payload,
+        weeklyTasks: weeklyTasks,
+        plans: plans,
+      );
 
       return ImportResult(ImportStatus.success,
           tasksImported: tasksImported, recurringImported: recurringImported);
@@ -86,7 +98,11 @@ class ImportService {
     }
   }
 
-  Future<ImportResult> pickAndImport(StorageService storage) async {
+  Future<ImportResult> pickAndImport(
+    StorageService storage, {
+    WeeklyTaskService? weeklyTasks,
+    PlanService? plans,
+  }) async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -123,7 +139,12 @@ class ImportService {
         return const ImportResult(ImportStatus.invalidFormat);
       }
 
-      final imported = await importFromJson(storage, content);
+      final imported = await importFromJson(
+        storage,
+        content,
+        weeklyTasks: weeklyTasks,
+        plans: plans,
+      );
       if (imported.status != ImportStatus.success) return imported;
       String? backupName;
       var backupWritable = false;

@@ -117,9 +117,14 @@ class BackupLibrary {
       throw const BackupNameException('There is no backup file to rename.');
     }
     if (active.sourceUri != null && active.sourceUri!.isNotEmpty) {
-      throw const BackupNameException(
-        'This file provider cannot rename the original backup. Create a new backup with the desired filename instead.',
-      );
+      final renamedUri = await _renameSourceUri(active.sourceUri!, safe);
+      if (renamedUri == null || renamedUri.isEmpty) {
+        throw const BackupNameException(
+          'This file provider cannot rename the original backup. Create a new backup with the desired filename instead.',
+        );
+      }
+      await _store(name: safe, path: null, sourceUri: renamedUri);
+      return ActiveBackup(name: safe, path: null, sourceUri: renamedUri);
     }
     if (active.path == null || active.path!.isEmpty) {
       throw const BackupNameException(
@@ -156,6 +161,22 @@ class BackupLibrary {
       await prefs.remove(_uriKey);
     } else {
       await prefs.setString(_uriKey, sourceUri);
+    }
+  }
+
+  Future<String?> _renameSourceUri(String uri, String name) async {
+    if (kIsWeb || uri.isEmpty) return null;
+    try {
+      return await _channel.invokeMethod<String>('renameBackup', {
+        'uri': uri,
+        'name': name,
+      });
+    } on PlatformException catch (error) {
+      debugPrint('Could not rename the imported backup: ${error.message}');
+      return null;
+    } catch (error) {
+      debugPrint('Could not rename the imported backup: $error');
+      return null;
     }
   }
 

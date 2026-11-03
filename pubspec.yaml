@@ -1,7 +1,7 @@
 name: twince
 description: Offline-first tasks with strict time windows.
 publish_to: none
-version: 1.0.0+1
+version: 1.1.2
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
@@ -58,3 +58,9 @@ flutter:
           weight: 500
         - asset: assets/fonts/vazirmatn/Vazirmatn-Bold.ttf
           weight: 700
+    # Full icon font. The web tree-shaken MaterialIcons face is registered under
+    # a different family name than the glyphs' font, so icon characters draw as
+    # boxes. This family is not referenced by const IconData, so it is not subset.
+    - family: TwinceIcons
+      fonts:
+        - asset: assets/fonts/MaterialIcons-Regular.otf

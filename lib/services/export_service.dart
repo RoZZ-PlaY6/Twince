@@ -7,7 +7,10 @@ import '../models/recurring_task.dart';
 import '../models/task.dart';
 import 'backup_library.dart';
 import 'backup_policy.dart';
+import 'backup_sections.dart';
+import 'plan_service.dart';
 import 'storage_service.dart';
+import 'weekly_task_service.dart';
 
 enum ExportStatus { shared, noData, unavailable }
 
@@ -21,14 +24,33 @@ class ExportService {
   static final instance = ExportService._();
   static const _channel = MethodChannel('twince/export');
 
-  String? encodeBackup(StorageService storage) {
+  String? encodeBackup(
+    StorageService storage, {
+    WeeklyTaskService? weeklyTasks,
+    PlanService? plans,
+  }) {
     final tasks = storage.getAllTasks();
     final recurringDefinitions = storage.getRecurringTasks();
-    if (tasks.isEmpty && recurringDefinitions.isEmpty) return null;
+    final weekly = weeklyTasks?.getAll() ?? const <WeeklyTask>[];
+    final planDefinitions = plans?.plans ?? const <PlanDefinition>[];
+    final occurrences = plans?.occurrences ?? const <String, String>{};
+    if (tasks.isEmpty &&
+        recurringDefinitions.isEmpty &&
+        weekly.isEmpty &&
+        planDefinitions.isEmpty &&
+        occurrences.isEmpty) {
+      return null;
+    }
 
     final taskMaps = tasks.map(_taskToJson).toList(growable: false);
     final recurringMaps =
         recurringDefinitions.map(_recurringToJson).toList(growable: false);
+    final weeklyMaps = weekly.map((task) => task.toJson()).toList();
+    final planMaps = planDefinitions.map((plan) => plan.toJson()).toList();
+    final occurrenceMaps = [
+      for (final entry in occurrences.entries)
+        {'key': entry.key, 'taskId': entry.value},
+    ];
     final payload = <String, dynamic>{
       'schemaVersion': 1,
       'exportedAt': DateTime.now().toIso8601String(),
@@ -37,6 +59,9 @@ class ExportService {
           .where((task) => task['status'] == TaskStatus.completed.name)
           .toList(growable: false),
       'recurringDefinitions': recurringMaps,
+      if (weeklyTasks != null) 'weeklyTasks': weeklyMaps,
+      if (plans != null) 'plans': planMaps,
+      if (plans != null) 'planOccurrences': occurrenceMaps,
       'hiveRecords': [
         ...taskMaps.map((value) => {
               'box': 'tasks',
@@ -50,6 +75,11 @@ class ExportService {
               'key': value['id'],
               'value': value,
             }),
+        if (weeklyTasks != null) ...weekly.map(weeklyHiveRecord),
+        if (plans != null) ...planDefinitions.map(planHiveRecord),
+        if (plans != null)
+          ...occurrences.entries
+              .map((entry) => planOccurrenceHiveRecord(entry.key, entry.value)),
       ],
       // The current app stores user preferences on task and recurring records.
       // Keep this explicit so future settings boxes can be added without changing
@@ -66,8 +96,16 @@ class ExportService {
     return const JsonEncoder.withIndent('  ').convert(payload);
   }
 
-  Future<ExportResult> exportAndShare(StorageService storage) async {
-    final contents = encodeBackup(storage);
+  Future<ExportResult> exportAndShare(
+    StorageService storage, {
+    WeeklyTaskService? weeklyTasks,
+    PlanService? plans,
+  }) async {
+    final contents = encodeBackup(
+      storage,
+      weeklyTasks: weeklyTasks,
+      plans: plans,
+    );
     if (contents == null) return const ExportResult(ExportStatus.noData);
     final created = await BackupLibrary.instance.createNew(
       name: timestampedBackupName(DateTime.now()),

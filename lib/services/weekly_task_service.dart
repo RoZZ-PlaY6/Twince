@@ -142,6 +142,15 @@ class WeeklyTaskService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Replaces the weekly-task box with [tasks].
+  Future<void> replaceAll(List<WeeklyTask> tasks) async {
+    await _box.clear();
+    for (final task in tasks) {
+      await _box.put(task.id, jsonEncode(task.toJson()));
+    }
+    notifyListeners();
+  }
+
   Future<void> adjust(String id, int delta) async {
     await reconcileWeek();
     final raw = _box.get(id);

@@ -1,8 +1,12 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../services/weekly_task_service.dart';
+import '../services/weekly_tasks_clipboard.dart';
 import '../theme/app_theme.dart';
 
 Future<void> showWeeklyTaskSheet(BuildContext context,
@@ -14,6 +18,68 @@ Future<void> showWeeklyTaskSheet(BuildContext context,
     builder: (_) => _WeeklyTaskSheet(
         task: task, service: context.read<WeeklyTaskService>()),
   );
+}
+
+@visibleForTesting
+Future<bool> confirmResetAll(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Reset all weekly tasks?'),
+      content: const Text(
+          'Reset progress for all weekly tasks to zero? Task definitions will be kept.'),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel')),
+        FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Reset all')),
+      ],
+    ),
+  );
+  return confirmed == true;
+}
+
+@visibleForTesting
+Future<bool> confirmDeleteWeeklyTask(BuildContext context, String title) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Delete weekly task?'),
+      content: Text('Delete "$title"? This cannot be undone.'),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel')),
+        FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete')),
+      ],
+    ),
+  );
+  return confirmed == true;
+}
+
+@visibleForTesting
+Future<bool> confirmDeleteAllWeeklyTasks(BuildContext context) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Delete all weekly tasks?'),
+      content: const Text(
+          'This will permanently remove all weekly tasks. This cannot be undone.'),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel')),
+        FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete all')),
+      ],
+    ),
+  );
+  return confirmed == true;
 }
 
 class _WeeklyTaskSheet extends StatefulWidget {
@@ -137,19 +203,190 @@ class _WeeklyTaskSheetState extends State<_WeeklyTaskSheet> {
       );
 }
 
-class WeeklyTasksScreen extends StatelessWidget {
-  const WeeklyTasksScreen({super.key});
+class WeeklyTasksScreen extends StatefulWidget {
+  const WeeklyTasksScreen({
+    super.key,
+    this.addButtonKey,
+  });
+
+  /// The floating action button rendered by the parent HomeScreen.
+  final GlobalKey? addButtonKey;
+
+  @override
+  State<WeeklyTasksScreen> createState() => _WeeklyTasksScreenState();
+}
+
+class _WeeklyTasksScreenState extends State<WeeklyTasksScreen> {
+  final GlobalKey _listKey = GlobalKey();
+  double _bottomClearance = 0;
+  bool _bulkRunning = false;
+  bool _copying = false;
+
+  void _measureBottomClearance() {
+    if (!mounted || widget.addButtonKey == null) return;
+    final listBox = _listKey.currentContext?.findRenderObject();
+    final buttonBox = widget.addButtonKey!.currentContext?.findRenderObject();
+    if (listBox is! RenderBox ||
+        buttonBox is! RenderBox ||
+        !listBox.hasSize ||
+        !buttonBox.hasSize) {
+      return;
+    }
+    final buttonTop =
+        listBox.globalToLocal(buttonBox.localToGlobal(Offset.zero)).dy;
+    final clearance = math.max(0.0, listBox.size.height - buttonTop);
+    if ((clearance - _bottomClearance).abs() > 0.5) {
+      setState(() => _bottomClearance = clearance);
+    }
+  }
+
+  Future<void> _copyTasks() async {
+    if (_copying || _bulkRunning) return;
+    final tasks = context.read<WeeklyTaskService>().getAll();
+    if (tasks.isEmpty) return;
+    setState(() => _copying = true);
+    try {
+      await copyWeeklyTasks(tasks);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Copied to clipboard!')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Copy failed: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => _copying = false);
+    }
+  }
+
+  Future<void> _resetAll() async {
+    if (_bulkRunning) return;
+    final service = context.read<WeeklyTaskService>();
+    final tasks = service.getAll();
+    if (tasks.isEmpty) return;
+    final confirmed = await confirmResetAll(context);
+    if (!confirmed || !mounted) return;
+    setState(() => _bulkRunning = true);
+    try {
+      for (final task in tasks) {
+        await service.save(task.copyWith(doneThisWeek: 0));
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('All weekly tasks reset.')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Reset failed: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => _bulkRunning = false);
+    }
+  }
+
+  Future<void> _deleteTask(String id, String title) async {
+    if (_bulkRunning) return;
+    final confirmed = await confirmDeleteWeeklyTask(context, title);
+    if (!confirmed || !mounted) return;
+    setState(() => _bulkRunning = true);
+    try {
+      await context.read<WeeklyTaskService>().delete(id);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Deleted "$title".')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Delete failed: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => _bulkRunning = false);
+    }
+  }
+
+  Future<void> _deleteAll() async {
+    if (_bulkRunning) return;
+    final service = context.read<WeeklyTaskService>();
+    final tasks = service.getAll();
+    if (tasks.isEmpty) return;
+    final confirmed = await confirmDeleteAllWeeklyTasks(context);
+    if (!confirmed || !mounted) return;
+    setState(() => _bulkRunning = true);
+    try {
+      for (final task in tasks) {
+        await service.delete(task.id);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('All weekly tasks deleted.')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Delete all failed: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => _bulkRunning = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final service = context.watch<WeeklyTaskService>();
     final tasks = service.getAll();
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _measureBottomClearance());
     return ListView(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 112),
+        key: _listKey,
+        padding: EdgeInsets.fromLTRB(
+            18, 16, 18, math.max(safeBottom, _bottomClearance) + 16),
         children: [
-          Text('Week of ${weeklyKey(DateTime.now())} (Saturday – Friday)',
-              style: const TextStyle(
-                  color: AppTheme.cyan, fontWeight: FontWeight.w600)),
+          Wrap(
+            spacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text('Week of ${weeklyKey(DateTime.now())} (Saturday – Friday)',
+                  style: const TextStyle(
+                      color: AppTheme.cyan, fontWeight: FontWeight.w600)),
+              if (tasks.isNotEmpty) ...[
+                OutlinedButton.icon(
+                  onPressed: _copying || _bulkRunning ? null : _copyTasks,
+                  icon: _copying
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.copy_rounded, size: 18),
+                  label: const Text('Copy Tasks'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.cyan,
+                    side:
+                        BorderSide(color: AppTheme.cyan.withValues(alpha: 0.6)),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _bulkRunning ? null : _resetAll,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.cyan,
+                  ),
+                  child: const Text('Reset all'),
+                ),
+                TextButton(
+                  onPressed: _bulkRunning ? null : _deleteAll,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.failed,
+                  ),
+                  child: const Text('Delete all'),
+                ),
+              ],
+            ],
+          ),
           const SizedBox(height: 16),
           if (tasks.isEmpty)
             const Padding(
@@ -176,10 +413,19 @@ class WeeklyTasksScreen extends StatelessWidget {
                                       fontWeight: FontWeight.w700))),
                           IconButton(
                               tooltip: 'Edit weekly task',
-                              onPressed: () =>
-                                  showWeeklyTaskSheet(context, task: task),
+                              onPressed: _bulkRunning
+                                  ? null
+                                  : () =>
+                                      showWeeklyTaskSheet(context, task: task),
                               icon: const Icon(Icons.edit_outlined,
                                   color: AppTheme.cyan)),
+                          IconButton(
+                              tooltip: 'Delete ${task.title}',
+                              onPressed: _bulkRunning
+                                  ? null
+                                  : () => _deleteTask(task.id, task.title),
+                              icon: const Icon(Icons.delete_outline_rounded,
+                                  color: AppTheme.failed)),
                         ]),
                         if (task.description.isNotEmpty)
                           Text(task.description,

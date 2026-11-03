@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/task.dart';
 import 'storage_service.dart';
+import 'week_cycle_service.dart';
 
 /// A template belongs to a plan; generated tasks remain independent Task records.
 class PlanEntry {
@@ -101,7 +102,7 @@ class PlanEntry {
     );
   }
 
-  Map<String, Object> toJson() => {
+  Map<String, Object?> toJson() => {
         'id': id,
         'title': title,
         'description': description,
@@ -134,20 +135,25 @@ class PlanDefinition {
     required this.university,
     required this.anchorMonday,
     required this.anchorOdd,
+    this.anchorSaturday,
     required this.entries,
   });
 
   final String id;
   final String name;
   final bool university;
+
+  /// Legacy field retained for plan_definitions_v1 compatibility.
   final DateTime anchorMonday;
+  final DateTime? anchorSaturday;
   final bool anchorOdd;
   final List<PlanEntry> entries;
 
   bool isOddOn(DateTime date) {
-    final monday = DateTime(date.year, date.month, date.day)
-        .subtract(Duration(days: date.weekday - 1));
-    final weeks = monday.difference(anchorMonday).inDays ~/ 7;
+    // Older plans only stored a Monday anchor. Its week began on the preceding
+    // Saturday; new plans also persist that Saturday explicitly.
+    final saturday = anchorSaturday ?? saturdayStartingWeek(anchorMonday);
+    final weeks = elapsedSaturdayWeeks(saturday, date);
     return weeks.isEven ? anchorOdd : !anchorOdd;
   }
 
@@ -155,17 +161,18 @@ class PlanDefinition {
         id: id,
         name: name,
         university: university,
-        anchorMonday: DateTime(now.year, now.month, now.day)
-            .subtract(Duration(days: now.weekday - 1)),
+        anchorMonday: anchorMonday,
+        anchorSaturday: saturdayStartingWeek(now),
         anchorOdd: odd,
         entries: entries,
       );
 
-  Map<String, Object> toJson() => {
+  Map<String, Object?> toJson() => {
         'id': id,
         'name': name,
         'university': university,
         'anchorMonday': anchorMonday.toIso8601String(),
+        'anchorSaturday': anchorSaturday?.toIso8601String(),
         'anchorOdd': anchorOdd,
         'entries': entries.map((entry) => entry.toJson()).toList(),
       };
@@ -175,6 +182,10 @@ class PlanDefinition {
         name: json['name'] as String,
         university: json['university'] as bool,
         anchorMonday: DateTime.parse(json['anchorMonday'] as String),
+        anchorSaturday: json['anchorSaturday'] == null
+            ? null
+            : saturdayStartingWeek(
+                DateTime.parse(json['anchorSaturday'] as String)),
         anchorOdd: json['anchorOdd'] as bool,
         entries: (json['entries'] as List)
             .map((entry) =>
@@ -192,21 +203,74 @@ class PlanService extends ChangeNotifier {
   final StorageService _tasks;
   Timer? _timer;
   bool _generating = false;
+  bool _generateAgain = false;
+  DateTime? _queuedClock;
+  final List<Completer<void>> _generationWaiters = [];
+  WeekCycleService? _cycle;
 
-  static Future<PlanService> initialize(StorageService tasks) async {
+  static Future<PlanService> initialize(StorageService tasks,
+      {WeekCycleService? cycle, DateTime? clock}) async {
     final plans = await Hive.openBox<String>('plan_definitions_v1');
     final generated = await Hive.openBox<String>('plan_occurrences_v1');
     final service = PlanService._(plans, generated, tasks);
-    await service.generateUpcoming();
+    if (cycle != null) service.bindWeekCycle(cycle);
+    await service.generateUpcoming(clock: clock);
     service._timer = Timer.periodic(
         const Duration(minutes: 1), (_) => service.generateUpcoming());
     return service;
   }
 
+  void bindWeekCycle(WeekCycleService cycle) {
+    if (identical(_cycle, cycle)) return;
+    _cycle?.removeListener(_onWeekCycleChanged);
+    _cycle = cycle;
+    cycle.addListener(_onWeekCycleChanged);
+  }
+
+  void _onWeekCycleChanged() {
+    notifyListeners();
+    unawaited(generateUpcoming());
+  }
+
+  bool _weekIsOdd(PlanDefinition plan, DateTime day) {
+    final cycle = _cycle;
+    if (cycle != null && cycle.isConfigured) return cycle.isOddOn(day);
+    return plan.isOddOn(day);
+  }
+
+  bool _entryRuns(PlanDefinition plan, PlanEntry entry, DateTime day) =>
+      planEntryRunsThisWeek(
+        everyWeek: !plan.university,
+        weeks: entry.weeks,
+        oddWeek: _weekIsOdd(plan, day),
+      );
+
   List<PlanDefinition> get plans => _plans.values
       .map((value) => PlanDefinition.fromJson(
           Map<String, dynamic>.from(jsonDecode(value) as Map)))
       .toList();
+
+  Map<String, String> get occurrences => {
+        for (final key in _generated.keys)
+          if (_generated.get(key) != null) key: _generated.get(key)!,
+      };
+
+  /// Replaces every plan template and occurrence ledger entry.
+  Future<void> replaceAll(
+    List<PlanDefinition> definitions, {
+    Map<String, String> occurrences = const {},
+  }) async {
+    await _plans.clear();
+    await _generated.clear();
+    for (final plan in definitions) {
+      await _plans.put(plan.id, jsonEncode(plan.toJson()));
+    }
+    for (final entry in occurrences.entries) {
+      await _generated.put(entry.key, entry.value);
+    }
+    notifyListeners();
+    await generateUpcoming();
+  }
 
   Future<void> save(PlanDefinition plan) async {
     final previousJson = _plans.get(plan.id);
@@ -229,16 +293,15 @@ class PlanService extends ChangeNotifier {
     for (final key in _generated.keys) {
       final parts = key.split(':');
       if (parts.length != 3 || parts[0] != updated.id) continue;
-      final day = DateTime.tryParse(parts[2]);
+      final day = _parsePlanDay(parts[2]);
       if (day == null) continue;
       final oldEntry =
           previous.entries.where((entry) => entry.id == parts[1]).firstOrNull;
       final newEntry =
           updated.entries.where((entry) => entry.id == parts[1]).firstOrNull;
       if (oldEntry == null || newEntry == null) continue;
-      final parity = updated.isOddOn(day) ? 'odd' : 'even';
       if (newEntry.weekday != day.weekday ||
-          (newEntry.weeks != 'both' && newEntry.weeks != parity)) {
+          !_entryRuns(updated, newEntry, day)) {
         continue;
       }
       final task = tasks[_generated.get(key)];
@@ -313,13 +376,24 @@ class PlanService extends ChangeNotifier {
   }
 
   Future<void> setCurrentWeek(PlanDefinition plan, bool odd) async {
-    await save(plan.withCurrentWeek(odd, DateTime.now()));
+    if (_cycle != null) {
+      await _cycle!.chooseCurrentWeek(odd);
+    } else {
+      await save(plan.withCurrentWeek(odd, DateTime.now()));
+    }
   }
 
   /// Creates ordinary tasks for today and the next two weeks. A ledger avoids
   /// recreating an occurrence that the user later deletes or completes.
   Future<void> generateUpcoming({DateTime? clock}) async {
-    if (_generating) return;
+    if (_generating) {
+      _generateAgain = true;
+      if (clock != null) _queuedClock = clock;
+      final waiter = Completer<void>();
+      _generationWaiters.add(waiter);
+      await waiter.future;
+      return;
+    }
     _generating = true;
     try {
       final now = clock ?? DateTime.now();
@@ -334,20 +408,21 @@ class PlanService extends ChangeNotifier {
         final plan =
             definitions.where((item) => item.id == parts[0]).firstOrNull;
         if (plan == null) continue;
-        final date = DateTime.tryParse(parts[2]);
+        final date = _parsePlanDay(parts[2]);
         if (date == null) continue;
         final entry =
             plan.entries.where((item) => item.id == parts[1]).firstOrNull;
         final matches = entry != null &&
             entry.weekday == date.weekday &&
-            (entry.weeks == 'both' ||
-                entry.weeks == (plan.isOddOn(date) ? 'odd' : 'even'));
+            _entryRuns(plan, entry, date);
         if (matches) continue;
         final id = _generated.get(key);
         final task = existing[id];
+        // Pending work whose alarm or window is still ahead must leave with
+        // the week that no longer applies. deleteTask cancels its alarm.
         if (task != null &&
             task.status == TaskStatus.pending &&
-            task.startTime.isAfter(now)) {
+            task.endTime.isAfter(now)) {
           await _tasks.deleteTask(task.id);
           existingIds.remove(task.id);
           await _generated.delete(key);
@@ -356,14 +431,19 @@ class PlanService extends ChangeNotifier {
       for (final plan in definitions) {
         for (var offset = 0; offset < 15; offset++) {
           final day = DateTime(today.year, today.month, today.day + offset);
-          final parity = plan.isOddOn(day) ? 'odd' : 'even';
           for (final entry in plan.entries) {
-            if (entry.weekday != day.weekday ||
-                (entry.weeks != 'both' && entry.weeks != parity)) {
+            if (entry.weekday != day.weekday || !_entryRuns(plan, entry, day)) {
               continue;
             }
-            final occurrenceKey =
-                '${plan.id}:${entry.id}:${day.year}-${day.month}-${day.day}';
+            final occurrenceKey = _occurrenceKey(plan.id, entry.id, day);
+            final legacyKey = _legacyOccurrenceKey(plan.id, entry.id, day);
+            if (legacyKey != null && _generated.containsKey(legacyKey)) {
+              final legacyId = _generated.get(legacyKey);
+              if (legacyId != null) {
+                await _generated.put(occurrenceKey, legacyId);
+              }
+              await _generated.delete(legacyKey);
+            }
             if (_generated.containsKey(occurrenceKey)) continue;
             final id = const Uuid()
                 .v5('6ba7b811-9dad-11d1-80b4-00c04fd430c8', occurrenceKey);
@@ -377,12 +457,52 @@ class PlanService extends ChangeNotifier {
       }
     } finally {
       _generating = false;
+      if (_generateAgain) {
+        final nextClock = _queuedClock;
+        _generateAgain = false;
+        _queuedClock = null;
+        await generateUpcoming(clock: nextClock);
+      }
+      final waiters = List<Completer<void>>.of(_generationWaiters);
+      _generationWaiters.clear();
+      for (final waiter in waiters) {
+        if (!waiter.isCompleted) waiter.complete();
+      }
     }
+  }
+
+  String _occurrenceKey(String planId, String entryId, DateTime day) =>
+      '$planId:$entryId:${_formatPlanDay(day)}';
+
+  String? _legacyOccurrenceKey(String planId, String entryId, DateTime day) {
+    final legacy = '$planId:$entryId:${day.year}-${day.month}-${day.day}';
+    final current = _occurrenceKey(planId, entryId, day);
+    return legacy == current ? null : legacy;
+  }
+
+  String _formatPlanDay(DateTime day) =>
+      '${day.year.toString().padLeft(4, '0')}-'
+      '${day.month.toString().padLeft(2, '0')}-'
+      '${day.day.toString().padLeft(2, '0')}';
+
+  DateTime? _parsePlanDay(String value) {
+    final parts = value.split('-');
+    if (parts.length != 3) return null;
+    final year = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    final day = int.tryParse(parts[2]);
+    if (year == null || month == null || day == null) return null;
+    final date = DateTime(year, month, day);
+    if (date.year != year || date.month != month || date.day != day) {
+      return null;
+    }
+    return date;
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _cycle?.removeListener(_onWeekCycleChanged);
     super.dispose();
   }
 }
