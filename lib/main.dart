@@ -12,6 +12,7 @@ import 'services/storage_service.dart';
 import 'services/plan_service.dart';
 import 'services/time_watcher_service.dart';
 import 'services/user_preferences_service.dart';
+import 'services/week_cycle_service.dart';
 import 'services/weekly_task_service.dart';
 import 'theme/app_theme.dart';
 
@@ -32,7 +33,8 @@ Future<void> main() async {
       alarms: AlarmService.instance,
     );
     await storage.reconcile();
-    final plans = await PlanService.initialize(storage);
+    final weekCycle = await WeekCycleService.load();
+    final plans = await PlanService.initialize(storage, cycle: weekCycle);
     final weeklyTasks = await WeeklyTaskService.initialize();
 
     // Initialize and start the foreground reminder scheduler
@@ -44,6 +46,7 @@ Future<void> main() async {
     runApp(TwinceApp(
       storage: storage,
       plans: plans,
+      weekCycle: weekCycle,
       weeklyTasks: weeklyTasks,
       reminderScheduler: reminderScheduler,
     ));
@@ -90,11 +93,13 @@ class TwinceApp extends StatefulWidget {
     super.key,
     required this.storage,
     required this.plans,
+    required this.weekCycle,
     required this.weeklyTasks,
     required this.reminderScheduler,
   });
   final StorageService storage;
   final PlanService plans;
+  final WeekCycleService weekCycle;
   final WeeklyTaskService weeklyTasks;
   final ReminderSchedulerService reminderScheduler;
 
@@ -112,6 +117,7 @@ class _TwinceAppState extends State<TwinceApp> with WidgetsBindingObserver {
     _watcher = TimeWatcherService(widget.storage)..start();
     _reminderScheduler = widget.reminderScheduler;
     WidgetsBinding.instance.addObserver(this);
+    widget.weekCycle.start();
     AlarmService.instance.listenForRestarts(widget.storage);
     unawaited(AlarmService.instance.consumePendingRestarts(widget.storage));
   }
@@ -120,6 +126,7 @@ class _TwinceAppState extends State<TwinceApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       widget.storage.reconcile();
+      widget.weekCycle.refresh();
       widget.plans.generateUpcoming();
       widget.weeklyTasks.reconcileWeek();
       unawaited(AlarmService.instance.consumePendingRestarts(widget.storage));
@@ -131,6 +138,7 @@ class _TwinceAppState extends State<TwinceApp> with WidgetsBindingObserver {
     _watcher.dispose();
     _reminderScheduler.dispose();
     widget.plans.dispose();
+    widget.weekCycle.dispose();
     widget.weeklyTasks.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -141,6 +149,7 @@ class _TwinceAppState extends State<TwinceApp> with WidgetsBindingObserver {
         providers: [
           ChangeNotifierProvider.value(value: widget.storage),
           ChangeNotifierProvider.value(value: widget.plans),
+          ChangeNotifierProvider.value(value: widget.weekCycle),
           ChangeNotifierProvider.value(value: widget.weeklyTasks),
         ],
         child: MaterialApp(

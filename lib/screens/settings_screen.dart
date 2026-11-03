@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:provider/provider.dart';
 
+import '../services/week_cycle_service.dart';
 import '../theme/app_theme.dart';
+import 'week_setup_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -33,6 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cycle = _watchWeekCycle(context);
     final versionLabel = _version == null
         ? 'Version …'
         : _version == 'unavailable'
@@ -68,6 +72,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  if (cycle != null && cycle.isConfigured) ...[
+                    Text(
+                      cycle.currentWeekLabel(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontFamily: AppTheme.persianFontFamily,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => showWeekCycleDialog(context, cycle),
+                      child: const Text(
+                        'تغییر',
+                        style:
+                            TextStyle(fontFamily: AppTheme.persianFontFamily),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   Text(
                     versionLabel,
                     textAlign: TextAlign.center,
@@ -95,5 +119,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+}
+
+WeekCycleService? _watchWeekCycle(BuildContext context) {
+  try {
+    return Provider.of<WeekCycleService>(context);
+  } on ProviderNotFoundException {
+    return null;
   }
 }

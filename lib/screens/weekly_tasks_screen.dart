@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../services/weekly_task_service.dart';
+import '../services/weekly_tasks_clipboard.dart';
 import '../theme/app_theme.dart';
 
 Future<void> showWeeklyTaskSheet(BuildContext context,
@@ -202,14 +204,62 @@ class _WeeklyTaskSheetState extends State<_WeeklyTaskSheet> {
 }
 
 class WeeklyTasksScreen extends StatefulWidget {
-  const WeeklyTasksScreen({super.key});
+  const WeeklyTasksScreen({
+    super.key,
+    this.addButtonKey,
+  });
+
+  /// The floating action button rendered by the parent HomeScreen.
+  final GlobalKey? addButtonKey;
 
   @override
   State<WeeklyTasksScreen> createState() => _WeeklyTasksScreenState();
 }
 
 class _WeeklyTasksScreenState extends State<WeeklyTasksScreen> {
+  final GlobalKey _listKey = GlobalKey();
+  double _bottomClearance = 0;
   bool _bulkRunning = false;
+  bool _copying = false;
+
+  void _measureBottomClearance() {
+    if (!mounted || widget.addButtonKey == null) return;
+    final listBox = _listKey.currentContext?.findRenderObject();
+    final buttonBox = widget.addButtonKey!.currentContext?.findRenderObject();
+    if (listBox is! RenderBox ||
+        buttonBox is! RenderBox ||
+        !listBox.hasSize ||
+        !buttonBox.hasSize) {
+      return;
+    }
+    final buttonTop =
+        listBox.globalToLocal(buttonBox.localToGlobal(Offset.zero)).dy;
+    final clearance = math.max(0.0, listBox.size.height - buttonTop);
+    if ((clearance - _bottomClearance).abs() > 0.5) {
+      setState(() => _bottomClearance = clearance);
+    }
+  }
+
+  Future<void> _copyTasks() async {
+    if (_copying || _bulkRunning) return;
+    final tasks = context.read<WeeklyTaskService>().getAll();
+    if (tasks.isEmpty) return;
+    setState(() => _copying = true);
+    try {
+      await copyWeeklyTasks(tasks);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Copied to clipboard!')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Copy failed: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => _copying = false);
+    }
+  }
 
   Future<void> _resetAll() async {
     if (_bulkRunning) return;
@@ -288,19 +338,38 @@ class _WeeklyTasksScreenState extends State<WeeklyTasksScreen> {
   Widget build(BuildContext context) {
     final service = context.watch<WeeklyTaskService>();
     final tasks = service.getAll();
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _measureBottomClearance());
     return ListView(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 112),
+        key: _listKey,
+        padding: EdgeInsets.fromLTRB(
+            18, 16, 18, math.max(safeBottom, _bottomClearance) + 16),
         children: [
-          Row(
+          Wrap(
+            spacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Text(
-                    'Week of ${weeklyKey(DateTime.now())} (Saturday – Friday)',
-                    style: const TextStyle(
-                        color: AppTheme.cyan, fontWeight: FontWeight.w600)),
-              ),
+              Text('Week of ${weeklyKey(DateTime.now())} (Saturday – Friday)',
+                  style: const TextStyle(
+                      color: AppTheme.cyan, fontWeight: FontWeight.w600)),
               if (tasks.isNotEmpty) ...[
-                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: _copying || _bulkRunning ? null : _copyTasks,
+                  icon: _copying
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.copy_rounded, size: 18),
+                  label: const Text('Copy Tasks'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.cyan,
+                    side:
+                        BorderSide(color: AppTheme.cyan.withValues(alpha: 0.6)),
+                  ),
+                ),
                 TextButton(
                   onPressed: _bulkRunning ? null : _resetAll,
                   style: TextButton.styleFrom(
@@ -308,7 +377,6 @@ class _WeeklyTasksScreenState extends State<WeeklyTasksScreen> {
                   ),
                   child: const Text('Reset all'),
                 ),
-                const SizedBox(width: 8),
                 TextButton(
                   onPressed: _bulkRunning ? null : _deleteAll,
                   style: TextButton.styleFrom(

@@ -21,12 +21,11 @@ object AlarmScheduler {
             return false
         }
         val manager = context.getSystemService(AlarmManager::class.java)
-        // Use setAlarmClock() for higher priority and status-bar alarm icon
-        val clockInfo = AlarmManager.AlarmClockInfo(
+        manager.setExactAndAllowWhileIdle(
+            AlarmManager.RTC_WAKEUP,
             data.triggerAtMillis,
             pendingIntent(context, data),
         )
-        manager.setAlarmClock(clockInfo, pendingIntent(context, data))
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putString(PREFIX + data.taskId, data.toJson())

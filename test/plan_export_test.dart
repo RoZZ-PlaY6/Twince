@@ -19,7 +19,7 @@ PlanDefinition samplePlan() => PlanDefinition(
           title: 'ریاضی',
           description: 'فصل اول',
           weekday: 1,
-          weeks: 'odd',
+          weeks: 'even',
           startSecond: 9 * 3600,
           endSecond: 10 * 3600 + 30 * 60,
           reminderMinutes: 15,
@@ -29,7 +29,7 @@ PlanDefinition samplePlan() => PlanDefinition(
           title: 'Physics',
           description: '',
           weekday: 3,
-          weeks: 'even',
+          weeks: 'odd',
           startSecond: 8 * 3600,
           endSecond: 9 * 3600 + 15 * 60,
           reminderMinutes: 15,
@@ -64,7 +64,7 @@ void main() {
     expect(decoded['exportedAt'], exportedAt);
     expect(decoded['timezone'], '+03:30');
     expect(
-        decoded['plan']['weekReference'], {'evenLabel': 'F', 'oddLabel': 'Z'});
+        decoded['plan']['weekReference'], {'evenLabel': 'Z', 'oddLabel': 'F'});
     final plan = decoded['plan'] as Map<String, dynamic>;
     expect(plan['id'], 'plan-1');
     expect(plan['title'], 'دانشگاه · University');
@@ -83,19 +83,19 @@ void main() {
     final z = tasks[0] as Map;
     expect(z['endTime'], '10:30');
     expect(z['days'], ['mon']);
-    expect(z['weekType'], 'odd');
+    expect(z['weekType'], 'even');
     expect(z['weekLabel'], 'Z');
     expect(z['description'], 'فصل اول');
     final f = tasks[1] as Map;
     expect(f['endTime'], '09:15');
     expect(f['days'], ['wed']);
-    expect(f['weekType'], 'even');
+    expect(f['weekType'], 'odd');
     expect(f['weekLabel'], 'F');
     final bothZ = tasks[2] as Map;
     final bothF = tasks[3] as Map;
-    expect(bothZ['weekType'], 'odd');
+    expect(bothZ['weekType'], 'even');
     expect(bothZ['weekLabel'], 'Z');
-    expect(bothF['weekType'], 'even');
+    expect(bothF['weekType'], 'odd');
     expect(bothF['weekLabel'], 'F');
     expect(bothZ['days'], ['fri']);
     expect(bothZ['endTime'], '15:00');

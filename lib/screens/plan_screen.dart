@@ -6,9 +6,11 @@ import 'package:uuid/uuid.dart';
 
 import '../services/plan_export.dart';
 import '../services/plan_service.dart';
+import '../services/week_cycle_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import 'add_task_bottom_sheet.dart';
+import 'week_setup_screen.dart';
 
 const _days = [
   'Monday',
@@ -57,6 +59,36 @@ Future<void> showAddPlanFlow(BuildContext context) async {
   );
 }
 
+class PlanWeekPrompt extends StatefulWidget {
+  const PlanWeekPrompt({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<PlanWeekPrompt> createState() => _PlanWeekPromptState();
+}
+
+class _PlanWeekPromptState extends State<PlanWeekPrompt> {
+  var _asked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ask());
+  }
+
+  Future<void> _ask() async {
+    if (_asked || !mounted) return;
+    final cycle = _watchWeekCycle(context, listen: false);
+    if (cycle == null || cycle.isConfigured) return;
+    _asked = true;
+    await showWeekCycleDialog(context, cycle, requiredChoice: true);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 class PlanScreen extends StatelessWidget {
   const PlanScreen({super.key});
 
@@ -76,25 +108,53 @@ class PlanScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => Consumer<PlanService>(
+  Widget build(BuildContext context) {
+    final cycle = _watchWeekCycle(context);
+    return PlanWeekPrompt(
+      child: Consumer<PlanService>(
         builder: (context, service, _) {
           final plans = service.plans;
+          final activeCycle =
+              cycle != null && cycle.isConfigured ? cycle : null;
           if (plans.isEmpty) {
-            return const Center(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.event_note_outlined, color: AppTheme.cyan, size: 50),
-                SizedBox(height: 12),
-                Text('No plans yet. Tap Add Plan to get started.',
-                    style: TextStyle(color: Colors.white70)),
-              ]),
-            );
+            return Column(children: [
+              if (activeCycle != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 20, 18, 0),
+                  child: PlanWeekBanner(cycle: activeCycle),
+                ),
+              const Expanded(
+                child: Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.event_note_outlined,
+                        color: AppTheme.cyan, size: 50),
+                    SizedBox(height: 12),
+                    Text('No plans yet. Tap Add Plan to get started.',
+                        style: TextStyle(color: Colors.white70)),
+                  ]),
+                ),
+              ),
+            ]);
           }
           return ListView.builder(
             padding: const EdgeInsets.fromLTRB(18, 20, 18, 108),
-            itemCount: plans.length,
+            itemCount: plans.length + (activeCycle != null ? 1 : 0),
             itemBuilder: (context, index) {
-              final plan = plans[index];
-              final odd = plan.isOddOn(DateTime.now());
+              if (activeCycle != null && index == 0) {
+                return PlanWeekBanner(cycle: activeCycle);
+              }
+              final plan = plans[index - (activeCycle != null ? 1 : 0)];
+              final now = DateTime.now();
+              final odd = cycle != null && cycle.isConfigured
+                  ? cycle.isOddOn(now)
+                  : plan.isOddOn(now);
+              final visible = plan.entries
+                  .where((entry) => planEntryRunsThisWeek(
+                        everyWeek: !plan.university,
+                        weeks: entry.weeks,
+                        oddWeek: odd,
+                      ))
+                  .toList();
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: AppTheme.neonCard(
@@ -129,7 +189,7 @@ class PlanScreen extends StatelessWidget {
                     ),
                   ]),
                   subtitle: Text(plan.university
-                      ? (odd ? 'Z week' : 'F week')
+                      ? WeekParity.fromOdd(odd).englishWeekLabel
                       : 'ETC · Every week'),
                   childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                   children: [
@@ -141,14 +201,22 @@ class PlanScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       SegmentedButton<bool>(
-                        segments: const [
-                          ButtonSegment(value: true, label: Text('Z')),
-                          ButtonSegment(value: false, label: Text('F')),
+                        segments: [
+                          ButtonSegment(
+                              value: WeekParity.odd.isOdd,
+                              label: Text(WeekParity.odd.code)),
+                          ButtonSegment(
+                              value: WeekParity.even.isOdd,
+                              label: Text(WeekParity.even.code)),
                         ],
                         selected: {odd},
                         onSelectionChanged: (value) async {
                           try {
-                            await service.setCurrentWeek(plan, value.first);
+                            if (cycle != null && cycle.isConfigured) {
+                              await cycle.chooseCurrentWeek(value.first);
+                            } else {
+                              await service.setCurrentWeek(plan, value.first);
+                            }
                           } catch (error) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -162,22 +230,68 @@ class PlanScreen extends StatelessWidget {
                       ),
                       const Divider(height: 24),
                     ],
-                    for (final entry in plan.entries)
-                      ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.checklist_rounded,
-                            color: AppTheme.purple),
-                        title: Text(entry.title),
-                        subtitle: Text(_entryLabel(entry, plan.university)),
-                      ),
+                    if (visible.isEmpty)
+                      const Text('No tasks this week.',
+                          style: TextStyle(color: Colors.white70))
+                    else
+                      for (final entry in visible)
+                        ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.checklist_rounded,
+                              color: AppTheme.purple),
+                          title: Text(entry.title),
+                          subtitle: Text(_entryLabel(entry, plan.university)),
+                        ),
                   ],
                 ),
               );
             },
           );
         },
-      );
+      ),
+    );
+  }
+}
+
+class PlanWeekBanner extends StatelessWidget {
+  const PlanWeekBanner({super.key, required this.cycle});
+
+  final WeekCycleService cycle;
+
+  @override
+  Widget build(BuildContext context) {
+    final odd = cycle.isOddOn(DateTime.now());
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.fromLTRB(16, 4, 4, 4),
+      decoration: AppTheme.neonCard(accent: AppTheme.cyan),
+      child: Row(children: [
+        Expanded(
+          child: Text(
+            WeekParity.fromOdd(odd).englishCurrentLabel,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Change week',
+          icon: const Icon(Icons.edit_outlined),
+          onPressed: () => showWeekCycleDialog(context, cycle),
+        ),
+      ]),
+    );
+  }
+}
+
+WeekCycleService? _watchWeekCycle(BuildContext context, {bool listen = true}) {
+  try {
+    return Provider.of<WeekCycleService>(context, listen: listen);
+  } on ProviderNotFoundException {
+    return null;
+  }
 }
 
 @visibleForTesting
@@ -291,7 +405,7 @@ class _PlanExportButtonState extends State<PlanExportButton> {
 }
 
 String _entryLabel(PlanEntry entry, bool university) =>
-    '${_days[entry.weekday - 1]} · ${_clock(entry.startSecond)}–${_clock(entry.endSecond)}${university ? ' · ${entry.weeks == 'odd' ? 'Z' : entry.weeks == 'even' ? 'F' : 'Z / F'}' : ''}';
+    '${_days[entry.weekday - 1]} · ${_clock(entry.startSecond)}–${_clock(entry.endSecond)}${university ? ' · ${WeekParity.fromStorage(entry.weeks)?.code ?? 'Z / F'}' : ''}';
 
 String _clock(int seconds) => DateFormat('HH:mm')
     .format(DateTime(2000, 1, 1).add(Duration(seconds: seconds)));
@@ -370,39 +484,52 @@ class _PlanEditorState extends State<_PlanEditor> {
       return;
     }
     var odd = true;
-    if (widget.university && widget.initial == null) {
+    final cycle = _watchWeekCycle(context, listen: false);
+    if (cycle != null && cycle.isConfigured) {
+      odd = cycle.isOddOn(DateTime.now());
+    } else if (widget.university && widget.initial == null) {
       final selected = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('Is this week Z or F?'),
-          content:
-              const Text('The plan will alternate automatically each Monday.'),
+          content: const Text(
+              'The plan will alternate automatically each Saturday.'),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('F')),
+                onPressed: () =>
+                    Navigator.pop(dialogContext, WeekParity.even.isOdd),
+                child: Text(WeekParity.even.code)),
             FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Z')),
+                onPressed: () =>
+                    Navigator.pop(dialogContext, WeekParity.odd.isOdd),
+                child: Text(WeekParity.odd.code)),
           ],
         ),
       );
       if (selected == null || !mounted) return;
       odd = selected;
     }
+    final planService = context.read<PlanService>();
     setState(() => _saving = true);
     try {
       final now = DateTime.now();
-      await context.read<PlanService>().save(PlanDefinition(
-            id: widget.initial?.id ?? const Uuid().v4(),
-            name: _name.text.trim(),
-            university: widget.university,
-            anchorMonday: widget.initial?.anchorMonday ??
-                DateTime(now.year, now.month, now.day)
-                    .subtract(Duration(days: now.weekday - 1)),
-            anchorOdd: widget.initial?.anchorOdd ?? odd,
-            entries: List.unmodifiable(_entries),
-          ));
+      if (cycle != null && !cycle.isConfigured) {
+        await cycle.chooseCurrentWeek(odd, now: now);
+      }
+      await planService.save(PlanDefinition(
+        id: widget.initial?.id ?? const Uuid().v4(),
+        name: _name.text.trim(),
+        university: widget.university,
+        anchorMonday: widget.initial?.anchorMonday ??
+            DateTime(now.year, now.month, now.day)
+                .subtract(Duration(days: now.weekday - 1)),
+        anchorSaturday: widget.initial?.anchorSaturday ??
+            (cycle != null && cycle.isConfigured
+                ? cycle.anchorSaturday
+                : saturdayStartingWeek(now)),
+        anchorOdd: widget.initial?.anchorOdd ?? odd,
+        entries: List.unmodifiable(_entries),
+      ));
       if (mounted) Navigator.pop(context);
     } catch (error) {
       if (mounted) {
@@ -531,10 +658,15 @@ class _PlanEntryDialogState extends State<_PlanEntryDialog> {
               DropdownButtonFormField<String>(
                 initialValue: _weeks,
                 decoration: const InputDecoration(labelText: 'Weeks'),
-                items: const [
-                  DropdownMenuItem(value: 'odd', child: Text('Z weeks')),
-                  DropdownMenuItem(value: 'even', child: Text('F weeks')),
-                  DropdownMenuItem(value: 'both', child: Text('Z / F weeks')),
+                items: [
+                  DropdownMenuItem(
+                      value: WeekParity.even.storageValue,
+                      child: Text(WeekParity.even.englishWeeksLabel)),
+                  DropdownMenuItem(
+                      value: WeekParity.odd.storageValue,
+                      child: Text(WeekParity.odd.englishWeeksLabel)),
+                  const DropdownMenuItem(
+                      value: 'both', child: Text('Z / F weeks')),
                 ],
                 onChanged: (value) {
                   if (value != null) setState(() => _weeks = value);

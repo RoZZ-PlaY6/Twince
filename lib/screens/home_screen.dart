@@ -44,6 +44,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final GlobalKey _addTaskButtonKey = GlobalKey();
   int _destination = 0;
 
   @override
@@ -68,7 +69,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (_destination == 2) {
                     return const PlanScreen();
                   }
-                  if (_destination == 1) return const WeeklyTasksScreen();
+                  if (_destination == 1) {
+                    return WeeklyTasksScreen(addButtonKey: _addTaskButtonKey);
+                  }
                   if (_destination == 3) return const SettingsScreen();
                   return TabBarView(children: [
                     _taskList(context, storage, tasks, TaskStatus.pending),
@@ -82,6 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
           floatingActionButton: _destination == 3
               ? null
               : Container(
+                  key: _addTaskButtonKey,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(28),
                     gradient: const LinearGradient(
@@ -180,8 +184,16 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ),
-                        const Spacer(),
-                        ..._topActions(),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            reverse: true,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: _topActions(),
+                            ),
+                          ),
+                        ),
                         const SizedBox(width: 6),
                       ],
                     ),

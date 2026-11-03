@@ -3,7 +3,9 @@ import 'package:twince/services/plan_service.dart';
 import 'package:twince/models/task.dart';
 
 void main() {
-  test('university week parity alternates across Mondays and persists', () {
+  test(
+      'legacy Monday plan anchors migrate to a Saturday week without losing parity',
+      () {
     final plan = PlanDefinition(
       id: 'test-plan',
       name: 'University',
@@ -23,18 +25,27 @@ void main() {
         ),
       ],
     );
-    expect(plan.isOddOn(DateTime(2026, 10, 25)), isTrue);
-    expect(plan.isOddOn(DateTime(2026, 10, 26)), isFalse);
-    expect(plan.isOddOn(DateTime(2026, 11, 2)), isTrue);
-    final restored = PlanDefinition.fromJson(plan.toJson());
+    expect(plan.isOddOn(DateTime(2026, 10, 17)), isTrue);
+    expect(plan.isOddOn(DateTime(2026, 10, 23, 23, 59)), isTrue);
+    expect(plan.isOddOn(DateTime(2026, 10, 24)), isFalse);
+    expect(plan.isOddOn(DateTime(2026, 10, 25)), isFalse);
+    expect(plan.isOddOn(DateTime(2026, 10, 30)), isFalse);
+    expect(plan.isOddOn(DateTime(2026, 10, 31)), isTrue);
+    final legacyJson = Map<String, dynamic>.from(plan.toJson())
+      ..remove('anchorSaturday');
+    final restored = PlanDefinition.fromJson(legacyJson);
     expect(restored.entries.single.title, 'Lecture');
-    expect(restored.isOddOn(DateTime(2026, 10, 26)), isFalse);
+    expect(restored.isOddOn(DateTime(2026, 10, 25)), isFalse);
 
-    final changed = restored.withCurrentWeek(false, DateTime(2026, 10, 21));
-    expect(changed.isOddOn(DateTime(2026, 10, 20)), isFalse);
-    expect(changed.isOddOn(DateTime(2026, 10, 27)), isTrue);
+    final edited = restored.withCurrentWeek(false, DateTime(2026, 10, 25));
+    expect(edited.anchorSaturday, DateTime(2026, 10, 24));
+    expect(edited.isOddOn(DateTime(2026, 10, 24)), isFalse);
+    expect(edited.isOddOn(DateTime(2026, 10, 30)), isFalse);
+    expect(edited.isOddOn(DateTime(2026, 10, 31)), isTrue);
+    final reloaded = PlanDefinition.fromJson(edited.toJson());
+    expect(reloaded.anchorSaturday, DateTime(2026, 10, 24));
+    expect(reloaded.isOddOn(DateTime(2026, 10, 31)), isTrue);
   });
-
   test('plan template retains alarm and notification options in JSON', () {
     final day = DateTime(2026, 10, 27);
     final task = Task(

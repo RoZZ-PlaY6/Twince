@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'plan_service.dart';
+import 'week_cycle_service.dart';
 
 /// Raised when a plan cannot be exported without inventing data.
 class PlanExportException implements Exception {
@@ -23,8 +24,8 @@ const planExportDayKeys = [
 
 /// Builds the Twince Alarm plan document from a stored [PlanDefinition].
 ///
-/// This app stores a Z week as `weeks: odd` and an F week as `weeks: even`.
-/// The export keeps that parity: Z is `weekType: odd`, F is `weekType: even`.
+/// Stored `weeks: even` is Z; stored `weeks: odd` is F.
+/// Exported week types retain the actual stored parity.
 Map<String, Object?> buildPlanExport(
   PlanDefinition plan, {
   required DateTime exportedAt,
@@ -47,8 +48,8 @@ Map<String, Object?> buildPlanExport(
       'title': plan.name,
       'weekMode': plan.university ? 'even_odd' : 'every',
       'weekReference': {
-        'evenLabel': 'F',
-        'oddLabel': 'Z',
+        'evenLabel': WeekParity.even.code,
+        'oddLabel': WeekParity.odd.code,
       },
       'tasks': [
         for (final entry in plan.entries) ...exportPlanTasks(entry),
@@ -89,9 +90,12 @@ List<Map<String, Object?>> exportPlanTasks(PlanEntry entry) {
         'enabled': true,
       };
   return switch (entry.weeks) {
-    'odd' => [task('odd', 'Z')],
-    'even' => [task('even', 'F')],
-    'both' => [task('odd', 'Z'), task('even', 'F')],
+    'odd' => [task(WeekParity.odd.storageValue, WeekParity.odd.code)],
+    'even' => [task(WeekParity.even.storageValue, WeekParity.even.code)],
+    'both' => [
+        task(WeekParity.even.storageValue, WeekParity.even.code),
+        task(WeekParity.odd.storageValue, WeekParity.odd.code),
+      ],
     _ =>
       throw PlanExportException('${entry.title} has no Z/F week assignment.'),
   };
