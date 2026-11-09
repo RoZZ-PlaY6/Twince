@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -25,38 +27,185 @@ const _days = [
 Future<void> showAddPlanFlow(BuildContext context) async {
   final university = await showModalBottomSheet<bool>(
     context: context,
-    showDragHandle: true,
-    builder: (sheetContext) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('Choose a plan type',
-              style: Theme.of(sheetContext).textTheme.titleLarge),
-          const SizedBox(height: 14),
-          ListTile(
-            leading: const Icon(Icons.school_outlined, color: AppTheme.cyan),
-            title: const Text('University'),
-            subtitle: const Text('Schedule classes for Z, F, or both weeks'),
-            onTap: () => Navigator.pop(sheetContext, true),
-          ),
-          ListTile(
-            leading: const Icon(Icons.edit_calendar_outlined,
-                color: AppTheme.purple),
-            title: const Text('ETC'),
-            subtitle: const Text('Create and name your own weekly plan'),
-            onTap: () => Navigator.pop(sheetContext, false),
-          ),
-        ]),
-      ),
+    showDragHandle: false,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) => _PlanTypeSheet(
+      onUniversity: () => Navigator.pop(sheetContext, true),
+      onEtc: () => Navigator.pop(sheetContext, false),
     ),
   );
   if (university == null || !context.mounted) return;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    showDragHandle: true,
+    backgroundColor: Colors.transparent,
     builder: (_) => _PlanEditor(university: university),
   );
+}
+
+class _PlanTypeSheet extends StatelessWidget {
+  const _PlanTypeSheet({required this.onUniversity, required this.onEtc});
+
+  final VoidCallback onUniversity;
+  final VoidCallback onEtc;
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xF20B1738), Color(0xF7071028)],
+              ),
+              border: Border(
+                top: BorderSide(color: AppTheme.blue.withValues(alpha: 0.7)),
+              ),
+            ),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF8EA4BE),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Choose a plan type',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _PlanTypeOption(
+                      icon: Icons.school_outlined,
+                      accent: AppTheme.cyan,
+                      title: 'University',
+                      description: 'Schedule classes for Z, F, or both weeks',
+                      onTap: onUniversity,
+                    ),
+                    const SizedBox(height: 12),
+                    _PlanTypeOption(
+                      icon: Icons.edit_calendar_outlined,
+                      accent: AppTheme.purple,
+                      title: 'ETC',
+                      description: 'Create and name your own weekly plan',
+                      onTap: onEtc,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+class _PlanTypeOption extends StatefulWidget {
+  const _PlanTypeOption({
+    required this.icon,
+    required this.accent,
+    required this.title,
+    required this.description,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color accent;
+  final String title;
+  final String description;
+  final VoidCallback onTap;
+
+  @override
+  State<_PlanTypeOption> createState() => _PlanTypeOptionState();
+}
+
+class _PlanTypeOptionState extends State<_PlanTypeOption> {
+  bool _highlighted = false;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+        onEnter: (_) => setState(() => _highlighted = true),
+        onExit: (_) => setState(() => _highlighted = false),
+        child: GestureDetector(
+          onTapDown: (_) => setState(() => _highlighted = true),
+          onTapCancel: () => setState(() => _highlighted = false),
+          onTapUp: (_) => setState(() => _highlighted = false),
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xCC122448),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color:
+                    widget.accent.withValues(alpha: _highlighted ? 0.95 : 0.4),
+                width: _highlighted ? 1.4 : 1,
+              ),
+              boxShadow: _highlighted
+                  ? [
+                      BoxShadow(
+                        color: widget.accent.withValues(alpha: 0.28),
+                        blurRadius: 16,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(children: [
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: widget.accent.withValues(alpha: 0.14),
+                  border:
+                      Border.all(color: widget.accent.withValues(alpha: 0.75)),
+                ),
+                child: Icon(widget.icon, color: widget.accent),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.description,
+                      style: const TextStyle(
+                        color: Color(0xFF9BB0C9),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ]),
+          ),
+        ),
+      );
 }
 
 class PlanWeekPrompt extends StatefulWidget {
@@ -176,7 +325,7 @@ class PlanScreen extends StatelessWidget {
                       onPressed: () => showModalBottomSheet<void>(
                         context: context,
                         isScrollControlled: true,
-                        showDragHandle: true,
+                        backgroundColor: Colors.transparent,
                         builder: (_) => _PlanEditor(
                             university: plan.university, initial: plan),
                       ),
@@ -543,72 +692,257 @@ class _PlanEditorState extends State<_PlanEditor> {
   }
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-        child: Padding(
-          padding:
-              EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-                maxHeight: MediaQuery.sizeOf(context).height * 0.85),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(
-                    '${widget.initial == null ? 'Add' : 'Edit'} ${widget.university ? 'University' : 'ETC'} Plan',
-                    style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _name,
-                  decoration: const InputDecoration(
-                      labelText: 'Plan name',
-                      prefixIcon: Icon(Icons.drive_file_rename_outline)),
-                ),
-                const SizedBox(height: 12),
-                Expanded(
-                    child: _entries.isEmpty
-                        ? const Center(
-                            child: Text('Add tasks to weekdays.',
-                                style: TextStyle(color: Colors.white70)))
-                        : ListView.builder(
-                            itemCount: _entries.length,
-                            itemBuilder: (context, index) {
-                              final entry = _entries[index];
-                              return Card(
-                                child: ListTile(
-                                  title: Text(entry.title),
-                                  subtitle: Text(
-                                      _entryLabel(entry, widget.university)),
-                                  onTap: () => _addEntry(old: entry),
-                                  trailing: IconButton(
-                                    tooltip: 'Remove task',
-                                    icon: const Icon(Icons.close_rounded),
-                                    onPressed: () =>
-                                        setState(() => _entries.remove(entry)),
-                                  ),
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final bottomInset = media.viewInsets.bottom;
+    final title =
+        '${widget.initial == null ? 'Add' : 'Edit'} ${widget.university ? 'University' : 'ETC'} Plan';
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xF20B1738), Color(0xF7071028)],
+              ),
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: media.size.height * 0.92 - bottomInset,
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                      20, 10, 20, bottomInset == 0 ? 18 : 12),
+                  child: Column(children: [
+                    Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF8EA4BE),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    TextField(
+                      controller: _name,
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      decoration: _planNameDecoration(),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: _entries.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'Add tasks to weekdays.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Color(0xFF9BB0C9),
+                                  fontSize: 15,
                                 ),
-                              );
-                            },
-                          )),
-                OutlinedButton.icon(
-                  onPressed: _saving ? null : _addEntry,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add task to day'),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _saving ? null : _save,
-                      icon: _saving
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.save_outlined),
-                      label: Text(
-                          widget.initial == null ? 'Create plan' : 'Save plan'),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: _entries.length,
+                              itemBuilder: (context, index) {
+                                final entry = _entries[index];
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xCC122448),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color:
+                                          AppTheme.cyan.withValues(alpha: 0.35),
+                                    ),
+                                  ),
+                                  child: ListTile(
+                                    title: Text(entry.title,
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w700)),
+                                    subtitle: Text(
+                                      _entryLabel(entry, widget.university),
+                                      style: const TextStyle(
+                                          color: Color(0xFF9BB0C9)),
+                                    ),
+                                    onTap: () => _addEntry(old: entry),
+                                    trailing: IconButton(
+                                      tooltip: 'Remove task',
+                                      icon: const Icon(Icons.close_rounded,
+                                          color: Color(0xFF9BB0C9)),
+                                      onPressed: () => setState(
+                                          () => _entries.remove(entry)),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                    const SizedBox(height: 16),
+                    Center(
+                        child: _PlanAddTaskButton(
+                      enabled: !_saving,
+                      onPressed: _addEntry,
                     )),
-              ]),
+                    const SizedBox(height: 12),
+                    _PlanCreateButton(
+                      saving: _saving,
+                      label:
+                          widget.initial == null ? 'Create plan' : 'Save plan',
+                      onPressed: _save,
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+InputDecoration _planNameDecoration() {
+  const radius = BorderRadius.all(Radius.circular(18));
+  return InputDecoration(
+    labelText: 'Plan name',
+    prefixIcon:
+        const Icon(Icons.drive_file_rename_outline, color: AppTheme.cyan),
+    filled: true,
+    fillColor: const Color(0xE6162A4A),
+    labelStyle: const TextStyle(color: Color(0xFF8EA4BE)),
+    floatingLabelStyle: const TextStyle(color: Color(0xFFD5E4F5)),
+    enabledBorder: const OutlineInputBorder(
+      borderRadius: radius,
+      borderSide: BorderSide(color: Color(0xFF3E6F9E)),
+    ),
+    focusedBorder: const OutlineInputBorder(
+      borderRadius: radius,
+      borderSide: BorderSide(color: AppTheme.cyan, width: 1.6),
+    ),
+  );
+}
+
+class _PlanAddTaskButton extends StatefulWidget {
+  const _PlanAddTaskButton({required this.enabled, required this.onPressed});
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  State<_PlanAddTaskButton> createState() => _PlanAddTaskButtonState();
+}
+
+class _PlanAddTaskButtonState extends State<_PlanAddTaskButton> {
+  bool _hot = false;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+        onEnter: (_) => setState(() => _hot = true),
+        onExit: (_) => setState(() => _hot = false),
+        child: OutlinedButton.icon(
+          onPressed: widget.enabled ? widget.onPressed : null,
+          onHover: (value) => setState(() => _hot = value),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppTheme.purple,
+            disabledForegroundColor: AppTheme.purple.withValues(alpha: 0.4),
+            backgroundColor: const Color(0x33122448),
+            side: BorderSide(
+              color: AppTheme.purple
+                  .withValues(alpha: _hot && widget.enabled ? 1 : 0.65),
+              width: _hot && widget.enabled ? 1.4 : 1,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shadowColor: AppTheme.purple.withValues(alpha: 0.4),
+            elevation: _hot && widget.enabled ? 2 : 0,
+          ),
+          icon: const Icon(Icons.add, color: AppTheme.purple),
+          label: const Text('Add task to day',
+              style: TextStyle(fontWeight: FontWeight.w700)),
+        ),
+      );
+}
+
+class _PlanCreateButton extends StatelessWidget {
+  const _PlanCreateButton({
+    required this.saving,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final bool saving;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: saving
+              ? null
+              : const LinearGradient(
+                  colors: [AppTheme.blue, AppTheme.purple],
+                ),
+          color: saving ? const Color(0xFF1A2C4A) : null,
+          boxShadow: saving
+              ? null
+              : [
+                  BoxShadow(
+                    color: AppTheme.purple.withValues(alpha: 0.32),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: saving ? null : onPressed,
+            child: SizedBox(
+              height: 52,
+              width: double.infinity,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white70,
+                          ),
+                        )
+                      : const Icon(Icons.save_outlined, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: saving ? Colors.white70 : Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -638,53 +972,171 @@ class _PlanEntryDialogState extends State<_PlanEntryDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-        title: Text(widget.initial == null ? 'Choose a day' : 'Edit schedule'),
-        content: SizedBox(
-          width: 400,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            DropdownButtonFormField<int>(
-              initialValue: _weekday,
-              decoration: const InputDecoration(labelText: 'Day of week'),
-              items: [
-                for (var i = 1; i <= 7; i++)
-                  DropdownMenuItem(value: i, child: Text(_days[i - 1]))
-              ],
-              onChanged: (value) {
-                if (value != null) setState(() => _weekday = value);
-              },
-            ),
-            if (widget.university)
-              DropdownButtonFormField<String>(
-                initialValue: _weeks,
-                decoration: const InputDecoration(labelText: 'Weeks'),
-                items: [
-                  DropdownMenuItem(
-                      value: WeekParity.even.storageValue,
-                      child: Text(WeekParity.even.englishWeeksLabel)),
-                  DropdownMenuItem(
-                      value: WeekParity.odd.storageValue,
-                      child: Text(WeekParity.odd.englishWeeksLabel)),
-                  const DropdownMenuItem(
-                      value: 'both', child: Text('Z / F weeks')),
-                ],
-                onChanged: (value) {
-                  if (value != null) setState(() => _weeks = value);
-                },
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xF20B1738), Color(0xF7071028)],
               ),
-          ]),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, (
-              weekday: _weekday,
-              weeks: widget.university ? _weeks : 'both'
-            )),
-            child: const Text('Next: task details'),
+              border: Border.all(color: AppTheme.blue.withValues(alpha: 0.7)),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 420,
+                maxHeight: media.size.height - media.padding.vertical - 48,
+              ),
+              child: SingleChildScrollView(
+                padding:
+                    EdgeInsets.fromLTRB(20, 20, 20, 16 + media.padding.bottom),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      widget.initial == null ? 'Choose a day' : 'Edit schedule',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    DropdownButtonFormField<int>(
+                      initialValue: _weekday,
+                      isExpanded: true,
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                          color: AppTheme.cyan),
+                      dropdownColor: const Color(0xFF132448),
+                      borderRadius: BorderRadius.circular(16),
+                      decoration: _planMenuField('Day of week'),
+                      items: [
+                        for (var i = 1; i <= 7; i++)
+                          DropdownMenuItem(
+                            value: i,
+                            child: Text(_days[i - 1],
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) setState(() => _weekday = value);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      initialValue: _weeks,
+                      isExpanded: true,
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                          color: AppTheme.purple),
+                      dropdownColor: const Color(0xFF132448),
+                      borderRadius: BorderRadius.circular(16),
+                      decoration: _planMenuField('Weeks'),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'even',
+                          child: Text('Z · Even · هفته زوج',
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        DropdownMenuItem(
+                          value: 'odd',
+                          child: Text('F · Odd · هفته فرد',
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        DropdownMenuItem(
+                          value: 'both',
+                          child: Text('Z / F weeks',
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) setState(() => _weeks = value);
+                      },
+                    ),
+                    const SizedBox(height: 22),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.purple,
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(height: 8),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: const LinearGradient(
+                          colors: [AppTheme.purple, Color(0xFF6D28D9)],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.purple.withValues(alpha: 0.32),
+                            blurRadius: 14,
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => Navigator.pop(context, (
+                            weekday: _weekday,
+                            weeks: _weeks,
+                          )),
+                          child: const SizedBox(
+                            height: 48,
+                            child: Center(
+                              child: Text(
+                                'Next: task details',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ],
-      );
+        ),
+      ),
+    );
+  }
+}
+
+InputDecoration _planMenuField(String label) {
+  const radius = BorderRadius.all(Radius.circular(18));
+  return InputDecoration(
+    labelText: label,
+    filled: true,
+    fillColor: const Color(0xE6162A4A),
+    labelStyle: const TextStyle(color: Color(0xFF8EA4BE)),
+    floatingLabelStyle: const TextStyle(color: Color(0xFFD5E4F5)),
+    contentPadding: const EdgeInsets.fromLTRB(16, 20, 12, 16),
+    enabledBorder: const OutlineInputBorder(
+      borderRadius: radius,
+      borderSide: BorderSide(color: Color(0xFF3E6F9E)),
+    ),
+    focusedBorder: const OutlineInputBorder(
+      borderRadius: radius,
+      borderSide: BorderSide(color: AppTheme.cyan, width: 1.6),
+    ),
+  );
 }

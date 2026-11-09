@@ -32,11 +32,14 @@ class ExportService {
     final tasks = storage.getAllTasks();
     final recurringDefinitions = storage.getRecurringTasks();
     final weekly = weeklyTasks?.getAll() ?? const <WeeklyTask>[];
+    final weeklyCategories =
+        weeklyTasks?.getCategories() ?? const <WeeklyCategory>[];
     final planDefinitions = plans?.plans ?? const <PlanDefinition>[];
     final occurrences = plans?.occurrences ?? const <String, String>{};
     if (tasks.isEmpty &&
         recurringDefinitions.isEmpty &&
         weekly.isEmpty &&
+        weeklyCategories.isEmpty &&
         planDefinitions.isEmpty &&
         occurrences.isEmpty) {
       return null;
@@ -60,6 +63,9 @@ class ExportService {
           .toList(growable: false),
       'recurringDefinitions': recurringMaps,
       if (weeklyTasks != null) 'weeklyTasks': weeklyMaps,
+      if (weeklyTasks != null)
+        'weeklyCategories':
+            weeklyCategories.map((category) => category.toJson()).toList(),
       if (plans != null) 'plans': planMaps,
       if (plans != null) 'planOccurrences': occurrenceMaps,
       'hiveRecords': [
@@ -76,6 +82,8 @@ class ExportService {
               'value': value,
             }),
         if (weeklyTasks != null) ...weekly.map(weeklyHiveRecord),
+        if (weeklyTasks != null)
+          ...weeklyCategories.map(weeklyCategoryHiveRecord),
         if (plans != null) ...planDefinitions.map(planHiveRecord),
         if (plans != null)
           ...occurrences.entries

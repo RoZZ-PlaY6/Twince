@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -230,58 +231,107 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       },
     );
 
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
     return Scaffold(
-      appBar: widget.embedded ? null : AppBar(title: const Text('Analytics')),
+      backgroundColor: _analyticsNight,
+      appBar: widget.embedded
+          ? null
+          : AppBar(
+              backgroundColor: _analyticsNight,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              foregroundColor: const Color(0xFFE8EEF7),
+              iconTheme: const IconThemeData(color: Color(0xFFE8EEF7)),
+              title: const Text(
+                'Analytics',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                ),
+              ),
+            ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 28 + bottomInset),
         children: [
           _glass(
               child: Row(children: [
             Expanded(
                 child: _choice('Tasks', !_weeklyTasks,
                     () => setState(() => _weeklyTasks = false),
-                    icon: Icons.task_alt_outlined)),
+                    icon: Icons.task_alt_outlined, expand: true)),
             const SizedBox(width: 8),
             Expanded(
                 child: _choice('Weekly tasks', _weeklyTasks,
                     () => setState(() => _weeklyTasks = true),
-                    icon: Icons.date_range_outlined)),
+                    icon: Icons.date_range_outlined, expand: true)),
           ])),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           _glass(
               child: Column(children: [
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              _choice('Weekly', _rangeMode == _RangeMode.weekly,
-                  () => setState(() => _rangeMode = _RangeMode.weekly)),
-              _choice('Monthly', _rangeMode == _RangeMode.monthly,
-                  () => setState(() => _rangeMode = _RangeMode.monthly)),
-              _choice('Custom Date', _rangeMode == _RangeMode.custom, () {
+            Row(children: [
+              Expanded(
+                  child: _choice('Weekly', _rangeMode == _RangeMode.weekly,
+                      () => setState(() => _rangeMode = _RangeMode.weekly),
+                      expand: true)),
+              const SizedBox(width: 6),
+              Expanded(
+                  child: _choice('Monthly', _rangeMode == _RangeMode.monthly,
+                      () => setState(() => _rangeMode = _RangeMode.monthly),
+                      expand: true)),
+              const SizedBox(width: 6),
+              Expanded(
+                  child: _choice('Custom Date', _rangeMode == _RangeMode.custom,
+                      () {
                 setState(() => _rangeMode = _RangeMode.custom);
                 _pickDate();
-              }),
+              }, expand: true)),
             ]),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Row(children: [
               if (_rangeMode != _RangeMode.custom)
                 IconButton(
-                    tooltip: 'Previous',
-                    onPressed: () => _move(-1),
-                    icon: const Icon(Icons.chevron_left, color: AppTheme.cyan)),
+                  tooltip: 'Previous',
+                  onPressed: () => _move(-1),
+                  style: IconButton.styleFrom(
+                    foregroundColor: AppTheme.cyan,
+                    minimumSize: const Size(44, 44),
+                    overlayColor: AppTheme.cyan.withValues(alpha: 0.16),
+                  ),
+                  icon: const Icon(Icons.chevron_left),
+                )
+              else
+                const SizedBox(width: 8),
               Expanded(
                   child: Text(_rangeLabel,
                       textAlign: TextAlign.center,
                       maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          color: AppTheme.cyan, fontWeight: FontWeight.w600))),
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15))),
               if (_rangeMode != _RangeMode.custom)
                 IconButton(
-                    tooltip: 'Next',
-                    onPressed: () => _move(1),
-                    icon:
-                        const Icon(Icons.chevron_right, color: AppTheme.cyan)),
+                  tooltip: 'Next',
+                  onPressed: () => _move(1),
+                  style: IconButton.styleFrom(
+                    foregroundColor: AppTheme.cyan,
+                    minimumSize: const Size(44, 44),
+                    overlayColor: AppTheme.cyan.withValues(alpha: 0.16),
+                  ),
+                  icon: const Icon(Icons.chevron_right),
+                )
+              else
+                const SizedBox(width: 8),
             ]),
             TextButton.icon(
                 onPressed: _pickDate,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.purple,
+                  overlayColor: AppTheme.purple.withValues(alpha: 0.16),
+                ),
                 icon: const Icon(Icons.calendar_month_outlined),
                 label: Text(_rangeMode == _RangeMode.custom
                     ? 'Choose date range'
@@ -299,38 +349,29 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     fontSize: 17,
                     fontWeight: FontWeight.w700)),
             const SizedBox(height: 10),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              _choice('نمودار ستونی / میله‌ای', _chartMode == _ChartMode.bars,
-                  () => setState(() => _chartMode = _ChartMode.bars),
-                  icon: Icons.bar_chart_rounded),
-              _choice('نمودار دایره‌ای', _chartMode == _ChartMode.donut,
-                  () => setState(() => _chartMode = _ChartMode.donut),
-                  icon: Icons.donut_large_rounded),
-              _choice(
-                  'نمودار درصدی تفکیکی',
-                  _chartMode == _ChartMode.distribution,
-                  () => setState(() => _chartMode = _ChartMode.distribution),
-                  icon: Icons.stacked_bar_chart_rounded),
-            ]),
-            const SizedBox(height: 10),
+            _chartModeChoices(),
+            const SizedBox(height: 12),
             Row(children: [
               Expanded(
                   child: _choice('All', _taskType == AnalyticsTaskType.all,
-                      () => setState(() => _taskType = AnalyticsTaskType.all))),
+                      () => setState(() => _taskType = AnalyticsTaskType.all),
+                      expand: true)),
               const SizedBox(width: 8),
               Expanded(
                   child: _choice(
                       'Standard',
                       _taskType == AnalyticsTaskType.standard,
                       () => setState(
-                          () => _taskType = AnalyticsTaskType.standard))),
+                          () => _taskType = AnalyticsTaskType.standard),
+                      expand: true)),
               const SizedBox(width: 8),
               Expanded(
                   child: _choice(
                       'Repeated',
                       _taskType == AnalyticsTaskType.repeated,
                       () => setState(
-                          () => _taskType = AnalyticsTaskType.repeated))),
+                          () => _taskType = AnalyticsTaskType.repeated),
+                      expand: true)),
             ]),
             const SizedBox(height: 20),
             ..._taskSection(tasks, items),
@@ -473,40 +514,145 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     ]));
   }
 
+  Widget _chartModeChoices() {
+    final choices = [
+      (
+        'نمودار ستونی / میله‌ای',
+        _chartMode == _ChartMode.bars,
+        () => setState(() => _chartMode = _ChartMode.bars),
+        Icons.bar_chart_rounded,
+      ),
+      (
+        'نمودار دایره‌ای',
+        _chartMode == _ChartMode.donut,
+        () => setState(() => _chartMode = _ChartMode.donut),
+        Icons.donut_large_rounded,
+      ),
+      (
+        'نمودار درصدی تفکیکی',
+        _chartMode == _ChartMode.distribution,
+        () => setState(() => _chartMode = _ChartMode.distribution),
+        Icons.stacked_bar_chart_rounded,
+      ),
+    ];
+    return LayoutBuilder(builder: (context, constraints) {
+      final stacked = constraints.maxWidth < 560;
+      final buttons = [
+        for (final choice in choices)
+          _choice(choice.$1, choice.$2, choice.$3,
+              icon: choice.$4, expand: stacked, pill: true),
+      ];
+      if (stacked) {
+        return Column(
+          children: [
+            for (var i = 0; i < buttons.length; i++) ...[
+              if (i > 0) const SizedBox(height: 8),
+              buttons[i],
+            ],
+          ],
+        );
+      }
+      return Wrap(spacing: 8, runSpacing: 8, children: buttons);
+    });
+  }
+
   Widget _choice(String label, bool selected, VoidCallback onTap,
-          {IconData? icon}) =>
-      OutlinedButton.icon(
-        onPressed: onTap,
-        icon: Icon(
-            icon ??
-                (selected
-                    ? Icons.check_circle_outline
-                    : Icons.calendar_today_outlined),
-            size: 17),
-        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: selected ? AppTheme.cyan : Colors.white70,
-          backgroundColor: selected
-              ? AppTheme.cyan.withAlpha(36)
-              : AppTheme.surface.withAlpha(128),
-          side: BorderSide(
-              color: selected ? AppTheme.cyan : AppTheme.purple.withAlpha(102)),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          {IconData? icon, bool expand = false, bool pill = false}) =>
+      Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(pill ? 22 : 14),
+          splashColor: AppTheme.cyan.withValues(alpha: 0.16),
+          highlightColor: AppTheme.purple.withValues(alpha: 0.12),
+          child: Ink(
+            width: expand ? double.infinity : null,
+            decoration: BoxDecoration(
+              color: selected
+                  ? AppTheme.cyan.withValues(alpha: 0.16)
+                  : const Color(0xCC101A33),
+              borderRadius: BorderRadius.circular(pill ? 22 : 14),
+              border: Border.all(
+                color: selected
+                    ? AppTheme.cyan
+                    : const Color(0xFF3A4E78).withValues(alpha: 0.9),
+              ),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: AppTheme.cyan.withValues(alpha: 0.22),
+                        blurRadius: 10,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                  horizontal: expand ? 8 : 12, vertical: 10),
+              child: expand
+                  ? FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: _choiceContent(label, selected, icon),
+                    )
+                  : _choiceContent(label, selected, icon),
+            ),
+          ),
         ),
       );
 
-  Widget _glass({required Widget child}) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.surface.withAlpha(184),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppTheme.purple.withAlpha(107)),
-          boxShadow: [
-            BoxShadow(color: AppTheme.cyan.withAlpha(14), blurRadius: 18)
-          ],
+  Widget _choiceContent(String label, bool selected, IconData? icon) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon ?? Icons.calendar_today_outlined,
+            size: 16,
+            color: selected ? AppTheme.cyan : const Color(0xFFC5D2E4),
+          ),
+          const SizedBox(width: 6),
+          _choiceLabel(label, selected),
+        ],
+      );
+
+  Widget _choiceLabel(String label, bool selected) => Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: selected ? AppTheme.cyan : const Color(0xFFE4ECF6),
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          fontSize: 13,
         ),
-        child: child,
+      );
+
+  Widget _glass({
+    required Widget child,
+    double radius = 20,
+    EdgeInsets padding = const EdgeInsets.all(16),
+  }) =>
+      ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xE6121C36), Color(0xD60B1224)],
+              ),
+              borderRadius: BorderRadius.circular(radius),
+              border: Border.all(color: const Color(0x663E6F9E)),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.cyan.withValues(alpha: 0.05),
+                  blurRadius: 16,
+                ),
+              ],
+            ),
+            child: Padding(padding: padding, child: child),
+          ),
+        ),
       );
 
   Widget _sectionTitle(String title, int count) => Row(children: [
@@ -520,26 +666,30 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _metrics(List<Task> tasks) {
     final counts = _counts(tasks);
     return _glass(
-        child: Wrap(
-            spacing: 18,
-            runSpacing: 12,
-            alignment: WrapAlignment.spaceEvenly,
-            children: [
-          _stat('Completed', counts[0], AppTheme.completed),
-          _stat('Pending', counts[1], AppTheme.cyan),
-          _stat('Failed', counts[2], AppTheme.failed),
-          _stat(
-              'Rate', '${_rate(counts).toStringAsFixed(1)}%', AppTheme.purple),
-        ]));
+        child: Row(children: [
+      _stat('Completed', counts[0], AppTheme.completed),
+      _stat('Pending', counts[1], AppTheme.cyan),
+      _stat('Failed', counts[2], AppTheme.failed),
+      _stat('Rate', '${_rate(counts).toStringAsFixed(1)}%', AppTheme.purple),
+    ]));
   }
 
-  Widget _stat(String name, Object value, Color color) =>
-      Column(mainAxisSize: MainAxisSize.min, children: [
-        Text('$value',
-            style: TextStyle(
-                color: color, fontSize: 21, fontWeight: FontWeight.bold)),
-        Text(name, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-      ]);
+  Widget _stat(String name, Object value, Color color) => Expanded(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text('$value',
+                maxLines: 1,
+                style: TextStyle(
+                    color: color, fontSize: 24, fontWeight: FontWeight.w800)),
+          ),
+          const SizedBox(height: 4),
+          Text(name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: _analyticsMuted, fontSize: 11)),
+        ]),
+      );
 
   List<Widget> _taskSection(List<Task> tasks, List<AnalyticsListItem> items) {
     final title = switch (_taskType) {
@@ -661,29 +811,56 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _taskRow(Task task) {
     final color = _statusColor(task.status);
     return Padding(
-        padding: const EdgeInsets.only(bottom: 7),
+        padding: const EdgeInsets.only(bottom: 8),
         child: _glass(
+            radius: 16,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             child: Row(children: [
-          Icon(
-              task.status == TaskStatus.completed
-                  ? Icons.check_circle_outline
-                  : task.status == TaskStatus.failed
-                      ? Icons.cancel_outlined
-                      : Icons.schedule_outlined,
-              color: color),
-          const SizedBox(width: 12),
-          Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(task.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-                Text(DateFormat.yMMMd().format(task.targetDate),
-                    style:
-                        const TextStyle(color: Colors.white54, fontSize: 12)),
-              ])),
-          const SizedBox(width: 8),
-          Text(task.status.name, style: TextStyle(color: color, fontSize: 12)),
-        ])));
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.cyan.withValues(alpha: 0.12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.cyan.withValues(alpha: 0.28),
+                      blurRadius: 10,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                    task.status == TaskStatus.completed
+                        ? Icons.check_circle_outline
+                        : task.status == TaskStatus.failed
+                            ? Icons.cancel_outlined
+                            : Icons.schedule_outlined,
+                    color: color,
+                    size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(task.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(DateFormat.yMMMd().format(task.targetDate),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: _analyticsMuted, fontSize: 12)),
+                  ])),
+              const SizedBox(width: 8),
+              Text(task.status.name,
+                  style: TextStyle(
+                      color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+            ])));
   }
 
   List<int> _counts(List<Task> tasks) => [
@@ -771,50 +948,72 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final maxCount = math.max(
         1, buckets.map((b) => b.reduce((a, b) => a + b)).reduce(math.max));
     return SizedBox(
-        height: 174,
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          itemCount: days,
-          itemBuilder: (context, i) => SizedBox(
-              width: 47,
-              child: Column(children: [
-                Expanded(
-                    child: Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Tooltip(
-                          message:
-                              '${DateFormat.yMMMd().format(DateTime(range.start.year, range.start.month, range.start.day + i))}: ${buckets[i][0]} completed, ${buckets[i][1]} pending, ${buckets[i][2]} failed',
-                          child: SizedBox(
-                              width: 25,
-                              height: 130,
-                              child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    for (final index in [2, 1, 0])
-                                      if (buckets[i][index] > 0)
-                                        Container(
-                                            height: 120 *
-                                                buckets[i][index] /
-                                                maxCount,
-                                            decoration: BoxDecoration(
-                                              color: [
-                                                AppTheme.completed,
-                                                AppTheme.cyan,
-                                                AppTheme.failed
-                                              ][index],
-                                              borderRadius:
-                                                  BorderRadius.circular(3),
-                                            )),
-                                  ])),
-                        ))),
-                const SizedBox(height: 6),
-                Text(
-                    DateFormat('d/M').format(DateTime(range.start.year,
-                        range.start.month, range.start.day + i)),
-                    style:
-                        const TextStyle(color: Colors.white60, fontSize: 10)),
-              ])),
-        ));
+        height: 180,
+        child: Stack(children: [
+          const Positioned(
+            left: 0,
+            right: 0,
+            top: 4,
+            bottom: 24,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _ChartGridLine(),
+                _ChartGridLine(),
+                _ChartGridLine(),
+                _ChartGridLine(),
+              ],
+            ),
+          ),
+          ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: days,
+            itemBuilder: (context, i) => SizedBox(
+                width: 52,
+                child: Column(children: [
+                  Expanded(
+                      child: Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Tooltip(
+                            message:
+                                '${DateFormat.yMMMd().format(DateTime(range.start.year, range.start.month, range.start.day + i))}: ${buckets[i][0]} completed, ${buckets[i][1]} pending, ${buckets[i][2]} failed',
+                            child: SizedBox(
+                                width: 20,
+                                height: 128,
+                                child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      for (final index in [2, 1, 0])
+                                        if (buckets[i][index] > 0)
+                                          Container(
+                                              width: 20,
+                                              height: 118 *
+                                                  buckets[i][index] /
+                                                  maxCount,
+                                              margin:
+                                                  const EdgeInsets.only(top: 1),
+                                              decoration: BoxDecoration(
+                                                color: [
+                                                  AppTheme.completed,
+                                                  AppTheme.cyan,
+                                                  AppTheme.failed
+                                                ][index],
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              )),
+                                    ])),
+                          ))),
+                  const SizedBox(height: 6),
+                  Text(
+                      DateFormat('d/M').format(DateTime(range.start.year,
+                          range.start.month, range.start.day + i)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: _analyticsMuted, fontSize: 11)),
+                ])),
+          ),
+        ]));
   }
 
   Widget _donut(List<int> counts) => Center(
@@ -878,6 +1077,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 }
 
+const _analyticsNight = Color(0xFF070B16);
+const _analyticsMuted = Color(0xFF9BB0C9);
+
+class _ChartGridLine extends StatelessWidget {
+  const _ChartGridLine();
+
+  @override
+  Widget build(BuildContext context) =>
+      Container(height: 1, color: const Color(0x14D6E4F5));
+}
+
 class _DonutPainter extends CustomPainter {
   const _DonutPainter(this.counts);
   final List<int> counts;
@@ -885,6 +1095,15 @@ class _DonutPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Rect.fromLTWH(10, 10, size.width - 20, size.height - 20);
+    canvas.drawArc(
+        rect,
+        0,
+        math.pi * 2,
+        false,
+        Paint()
+          ..color = const Color(0x14D6E4F5)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 22);
     var angle = -math.pi / 2;
     final total = counts.reduce((a, b) => a + b);
     for (var i = 0; i < counts.length; i++) {

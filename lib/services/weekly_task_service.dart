@@ -24,6 +24,23 @@ class WeeklyResult {
   Map<String, int> toJson() => {'done': done, 'target': target};
 }
 
+class WeeklyCategory {
+  WeeklyCategory({String? id, required this.name})
+      : id = id ?? const Uuid().v4();
+
+  final String id;
+  final String name;
+
+  Map<String, String> toJson() => {'id': id, 'name': name};
+
+  factory WeeklyCategory.fromJson(Map<String, dynamic> json) => WeeklyCategory(
+        id: json['id'] as String,
+        name: json['name'] as String,
+      );
+}
+
+const uncategorizedWeeklyLabel = 'Uncategorized';
+
 class WeeklyTask {
   WeeklyTask({
     String? id,
@@ -32,6 +49,7 @@ class WeeklyTask {
     required this.targetPerWeek,
     this.doneThisWeek = 0,
     required this.weekKey,
+    this.categoryId,
     Map<String, WeeklyResult>? history,
   })  : id = id ?? const Uuid().v4(),
         history = history ?? {} {
@@ -49,6 +67,9 @@ class WeeklyTask {
   final int targetPerWeek;
   final int doneThisWeek;
   final String weekKey;
+
+  /// Null when the task is not assigned to a user-defined category.
+  final String? categoryId;
   final Map<String, WeeklyResult> history;
 
   WeeklyResult resultFor(String key) => key == weekKey
@@ -61,6 +82,7 @@ class WeeklyTask {
           int? targetPerWeek,
           int? doneThisWeek,
           String? weekKey,
+          Object? categoryId = _keepCategory,
           Map<String, WeeklyResult>? history}) =>
       WeeklyTask(
         id: id,
@@ -69,6 +91,9 @@ class WeeklyTask {
         targetPerWeek: targetPerWeek ?? this.targetPerWeek,
         doneThisWeek: doneThisWeek ?? this.doneThisWeek,
         weekKey: weekKey ?? this.weekKey,
+        categoryId: identical(categoryId, _keepCategory)
+            ? this.categoryId
+            : categoryId as String?,
         history: history ?? this.history,
       );
 
@@ -79,6 +104,7 @@ class WeeklyTask {
         'targetPerWeek': targetPerWeek,
         'doneThisWeek': doneThisWeek,
         'weekKey': weekKey,
+        'categoryId': categoryId,
         'history': history.map((key, value) => MapEntry(key, value.toJson())),
       };
 
@@ -91,6 +117,9 @@ class WeeklyTask {
       targetPerWeek: json['targetPerWeek'] as int,
       doneThisWeek: json['doneThisWeek'] as int? ?? 0,
       weekKey: json['weekKey'] as String,
+      categoryId: (json['categoryId'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : json['categoryId'] as String,
       history: rawHistory.map((key, value) {
         final result = Map<String, dynamic>.from(value as Map);
         return MapEntry(
@@ -100,13 +129,16 @@ class WeeklyTask {
   }
 }
 
+const _keepCategory = Object();
+
 /// A separate String box avoids any changes to the existing Task adapters.
 class WeeklyTaskService extends ChangeNotifier {
-  WeeklyTaskService._(this._box) {
+  WeeklyTaskService._(this._box, this._categories) {
     _scheduleRollover();
   }
 
   final Box<String> _box;
+  final Box<String> _categories;
   late Timer _timer;
   bool _disposed = false;
 
@@ -121,8 +153,10 @@ class WeeklyTaskService extends ChangeNotifier {
   }
 
   static Future<WeeklyTaskService> initialize() async {
-    final service =
-        WeeklyTaskService._(await Hive.openBox<String>('weekly_tasks'));
+    final service = WeeklyTaskService._(
+      await Hive.openBox<String>('weekly_tasks'),
+      await Hive.openBox<String>('weekly_categories'),
+    );
     await service.reconcileWeek();
     return service;
   }
@@ -131,6 +165,66 @@ class WeeklyTaskService extends ChangeNotifier {
       .map((value) =>
           WeeklyTask.fromJson(jsonDecode(value) as Map<String, dynamic>))
       .toList();
+
+  List<WeeklyCategory> getCategories() {
+    final categories = _categories.values
+        .map((value) =>
+            WeeklyCategory.fromJson(jsonDecode(value) as Map<String, dynamic>))
+        .toList();
+    categories
+        .sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return categories;
+  }
+
+  /// Saves a category name. An existing name is reused, ignoring case.
+  Future<WeeklyCategory> createCategory(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError('Enter a category name.');
+    }
+    final existing = getCategories()
+        .where(
+            (category) => category.name.toLowerCase() == trimmed.toLowerCase())
+        .firstOrNull;
+    if (existing != null) return existing;
+    final category = WeeklyCategory(name: trimmed);
+    await _categories.put(category.id, jsonEncode(category.toJson()));
+    notifyListeners();
+    return category;
+  }
+
+  Future<void> assignCategory(String taskId, String? categoryId) async {
+    final raw = _box.get(taskId);
+    if (raw == null) return;
+    final task = WeeklyTask.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    await save(task.copyWith(categoryId: categoryId));
+  }
+
+  /// Removes the category and leaves its tasks in place, uncategorized.
+  Future<void> deleteCategory(String id) async {
+    await _categories.delete(id);
+    for (final task in getAll()) {
+      if (task.categoryId != id) continue;
+      await _box.put(
+          task.id, jsonEncode(task.copyWith(categoryId: null).toJson()));
+    }
+    notifyListeners();
+  }
+
+  Future<void> replaceCategories(List<WeeklyCategory> categories) async {
+    await _categories.clear();
+    for (final category in categories) {
+      await _categories.put(category.id, jsonEncode(category.toJson()));
+    }
+    notifyListeners();
+  }
+
+  String categoryName(String? categoryId) =>
+      getCategories()
+          .where((category) => category.id == categoryId)
+          .firstOrNull
+          ?.name ??
+      uncategorizedWeeklyLabel;
 
   Future<void> save(WeeklyTask task) async {
     await _box.put(task.id, jsonEncode(task.toJson()));

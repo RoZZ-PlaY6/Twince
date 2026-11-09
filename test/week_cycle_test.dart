@@ -166,7 +166,15 @@ void main() {
       isTrue,
     );
     expect(
+      planEntryRunsThisWeek(everyWeek: true, weeks: 'both', oddWeek: false),
+      isTrue,
+    );
+    expect(
       planEntryRunsThisWeek(everyWeek: true, weeks: 'odd', oddWeek: false),
+      isFalse,
+    );
+    expect(
+      planEntryRunsThisWeek(everyWeek: true, weeks: 'even', oddWeek: false),
       isTrue,
     );
   });
@@ -266,40 +274,44 @@ void main() {
     await cycle.chooseCurrentWeek(WeekParity.even.isOdd, now: DateTime.now());
     await mount(cycle);
     await tester.tap(find.text('Plan'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Current week: Even (Z)'), findsOneWidget);
     await tester.tap(find.byTooltip('Change week'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('هفته زوج (Z)'), findsOneWidget);
     expect(find.text('هفته فرد (F)'), findsOneWidget);
     await tester.tap(find.text('هفته فرد (F)'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Current week: Odd (F)'), findsOneWidget);
     expect(cycle.isOddOn(DateTime.now()), isTrue);
 
     await tester.tap(find.text('Settings'));
-    await tester.pumpAndSettle();
-    expect(find.text('هفته جاری: فرد (F)'), findsOneWidget);
-    await tester.tap(find.text('تغییر'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('هفته زوج (Z)'));
-    await tester.pumpAndSettle();
-    expect(find.text('هفته جاری: زوج (Z)'), findsOneWidget);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('هفته جاری: فرد (F)'), findsNothing);
+    expect(find.text('تغییر'), findsNothing);
+    expect(find.text('Settings'), findsWidgets);
 
     await tester.pumpWidget(const SizedBox.shrink());
     final restored = WeekCycleService(prefs);
     expect(restored.anchorSaturday, saturdayStartingWeek(DateTime.now()));
+    expect(restored.isOddOn(DateTime.now()), isTrue);
     await mount(restored);
     await tester.tap(find.text('Plan'));
-    await tester.pumpAndSettle();
-    expect(find.text('Current week: Even (Z)'), findsOneWidget);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Current week: Odd (F)'), findsOneWidget);
     await tester.tap(find.byTooltip('Change week'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('هفته زوج (Z)'), findsOneWidget);
     expect(find.text('هفته فرد (F)'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
-  testWidgets('settings shows the current week and confirms a change',
+  testWidgets('settings does not show or change the current week',
       (tester) async {
     final cycle = WeekCycleService(prefs);
     await cycle.chooseCurrentWeek(true, now: DateTime.now());
@@ -309,21 +321,11 @@ void main() {
     ));
     await tester.pump();
 
-    expect(find.text('هفته جاری: فرد (F)'), findsOneWidget);
-    await tester.tap(find.text('تغییر'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('انصراف'));
-    await tester.pumpAndSettle();
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('هفته جاری: فرد (F)'), findsNothing);
+    expect(find.text('تغییر'), findsNothing);
     expect(cycle.isOddOn(DateTime.now()), isTrue);
-
-    await tester.tap(find.text('تغییر'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('هفته زوج (Z)'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('هفته جاری: زوج (Z)'), findsOneWidget);
-    expect(cycle.isOddOn(DateTime.now()), isFalse);
-    expect(cycle.anchorSaturday, saturdayStartingWeek(DateTime.now()));
+    expect(tester.takeException(), isNull);
   });
 }
 

@@ -15,6 +15,7 @@ import 'services/user_preferences_service.dart';
 import 'services/week_cycle_service.dart';
 import 'services/weekly_task_service.dart';
 import 'theme/app_theme.dart';
+import 'theme/twince_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -155,7 +156,7 @@ class _TwinceAppState extends State<TwinceApp> with WidgetsBindingObserver {
         child: MaterialApp(
           title: 'Twince',
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.dark,
+          theme: UserPreferencesService.instance.appTheme.themeData,
           home: const HomeScreen(),
         ),
       );

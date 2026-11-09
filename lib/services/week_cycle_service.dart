@@ -56,14 +56,17 @@ int elapsedSaturdayWeeks(DateTime anchorSaturday, DateTime date) {
 
 /// Whether a plan entry runs during the week described by [oddWeek].
 ///
-/// `odd` is F and `even` is Z. An every-week plan runs regardless of parity.
+/// `odd` is F and `even` is Z. `both` runs every week.
+/// An explicit Z or F choice is honored for University and ETC plans.
 bool planEntryRunsThisWeek({
   required bool everyWeek,
   required String weeks,
   required bool oddWeek,
 }) {
-  if (everyWeek || weeks == 'both') return true;
-  return WeekParity.fromStorage(weeks) == WeekParity.fromOdd(oddWeek);
+  if (weeks == 'both') return true;
+  final stored = WeekParity.fromStorage(weeks);
+  if (stored == null) return everyWeek;
+  return stored == WeekParity.fromOdd(oddWeek);
 }
 
 /// Global Z/F cycle. Odd weeks are F and even weeks are Z.

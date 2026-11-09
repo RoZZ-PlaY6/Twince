@@ -36,12 +36,14 @@ void main() {
 
   test('backup and restore keep tasks, weekly tasks, and plans', () async {
     storage.tasks['read'] = _task('read', 'Read');
+    final health = await weekly.createCategory('Health');
     await weekly.save(WeeklyTask(
       id: 'exercise',
       title: 'Exercise',
       targetPerWeek: 3,
       doneThisWeek: 1,
       weekKey: weeklyKey(DateTime.now()),
+      categoryId: health.id,
     ));
     await plans.replaceAll([_plan('university', 'University')]);
 
@@ -53,10 +55,16 @@ void main() {
     final payload = jsonDecode(encoded!) as Map<String, dynamic>;
     expect(payload['schemaVersion'], 1);
     expect(payload['weeklyTasks'], isNotEmpty);
+    expect(payload['weeklyCategories'], isNotEmpty);
     expect(payload['plans'], isNotEmpty);
     expect(
       (payload['hiveRecords'] as List).map((record) => record['box']),
-      containsAll(['tasks', 'weekly_tasks', 'plan_definitions_v1']),
+      containsAll([
+        'tasks',
+        'weekly_tasks',
+        'weekly_categories',
+        'plan_definitions_v1',
+      ]),
     );
 
     storage.tasks
@@ -70,6 +78,8 @@ void main() {
         weekKey: weeklyKey(DateTime.now()),
       ),
     ]);
+    await weekly
+        .replaceCategories([WeeklyCategory(id: 'other', name: 'Other')]);
     await plans.replaceAll([_plan('etc', 'ETC')]);
 
     final restored = await ImportService.instance.importFromJson(
@@ -81,7 +91,10 @@ void main() {
     expect(restored.status, ImportStatus.success);
     expect(storage.tasks.values.map((task) => task.title), contains('Read'));
     expect(storage.tasks.containsKey('other'), isFalse);
-    expect(weekly.getAll().map((task) => task.title), ['Exercise']);
+    final exercise = weekly.getAll().single;
+    expect(exercise.title, 'Exercise');
+    expect(exercise.categoryId, health.id);
+    expect(weekly.getCategories().single.name, 'Health');
     expect(plans.plans.map((plan) => plan.name), ['University']);
   });
 
@@ -108,9 +121,10 @@ void main() {
       plans: plans,
     );
     expect(restored.status, ImportStatus.success);
-    expect(storage.tasks.values.map((task) => task.title), contains('Kept task'));
     expect(
-        storage.tasks.values.map((task) => task.title), isNot(contains('Temporary')));
+        storage.tasks.values.map((task) => task.title), contains('Kept task'));
+    expect(storage.tasks.values.map((task) => task.title),
+        isNot(contains('Temporary')));
     expect(weekly.getAll().single.title, 'Kept weekly');
     expect(plans.plans.single.name, 'Kept plan');
   });

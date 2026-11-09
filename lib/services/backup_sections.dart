@@ -8,20 +8,24 @@ import 'weekly_task_service.dart';
 class BackupSections {
   const BackupSections({
     this.weeklyTasks,
+    this.weeklyCategories,
     this.plans,
     this.planOccurrences,
   });
 
   final List<WeeklyTask>? weeklyTasks;
+  final List<WeeklyCategory>? weeklyCategories;
   final List<PlanDefinition>? plans;
   final Map<String, String>? planOccurrences;
 
   static BackupSections read(Map<String, dynamic> payload) {
     final records = payload['hiveRecords'];
     final weeklyFromHive = <WeeklyTask>[];
+    final categoriesFromHive = <WeeklyCategory>[];
     final plansFromHive = <PlanDefinition>[];
     final occurrencesFromHive = <String, String>{};
     var sawWeekly = false;
+    var sawCategories = false;
     var sawPlans = false;
     var sawOccurrences = false;
     if (records is List) {
@@ -34,6 +38,10 @@ class BackupSections {
           sawWeekly = true;
           weeklyFromHive
               .add(WeeklyTask.fromJson(Map<String, dynamic>.from(value)));
+        } else if (box == 'weekly_categories' && value is Map) {
+          sawCategories = true;
+          categoriesFromHive
+              .add(WeeklyCategory.fromJson(Map<String, dynamic>.from(value)));
         } else if (box == 'plan_definitions_v1' && value is Map) {
           sawPlans = true;
           plansFromHive
@@ -52,6 +60,9 @@ class BackupSections {
     return BackupSections(
       weeklyTasks:
           sawWeekly ? weeklyFromHive : _weeklyFromList(payload['weeklyTasks']),
+      weeklyCategories: sawCategories
+          ? categoriesFromHive
+          : _categoriesFromList(payload['weeklyCategories']),
       plans: sawPlans ? plansFromHive : _plansFromList(payload['plans']),
       planOccurrences: sawOccurrences
           ? occurrencesFromHive
@@ -64,6 +75,15 @@ class BackupSections {
     return [
       for (final item in raw)
         if (item is Map) WeeklyTask.fromJson(Map<String, dynamic>.from(item)),
+    ];
+  }
+
+  static List<WeeklyCategory>? _categoriesFromList(Object? raw) {
+    if (raw is! List) return null;
+    return [
+      for (final item in raw)
+        if (item is Map)
+          WeeklyCategory.fromJson(Map<String, dynamic>.from(item)),
     ];
   }
 
@@ -85,6 +105,13 @@ class BackupSections {
     };
   }
 }
+
+Map<String, Object> weeklyCategoryHiveRecord(WeeklyCategory category) => {
+      'box': 'weekly_categories',
+      'type': 'WeeklyCategory',
+      'key': category.id,
+      'value': category.toJson(),
+    };
 
 Map<String, Object> weeklyHiveRecord(WeeklyTask task) => {
       'box': 'weekly_tasks',
@@ -117,6 +144,10 @@ Future<void> restoreBackupSections(
   final weekly = sections.weeklyTasks;
   if (weekly != null && weeklyTasks != null) {
     await weeklyTasks.replaceAll(weekly);
+  }
+  final categories = sections.weeklyCategories;
+  if (categories != null && weeklyTasks != null) {
+    await weeklyTasks.replaceCategories(categories);
   }
   final definitions = sections.plans;
   if (definitions != null && plans != null) {

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/task.dart';
+import '../theme/twince_theme.dart';
 
 /// Built-in alarm tones offered by the in-app picker.
 const builtInAlarmSounds = <String, String>{
@@ -37,6 +38,7 @@ class UserPreferencesService {
   static const _kAlarmSoundType = 'last_alarm_sound_type';
   static const _kAlarmSoundId = 'last_alarm_sound_id';
   static const _kAlarmSoundUri = 'last_alarm_sound_uri';
+  static const _kAppTheme = 'app_theme';
 
   /// Initialises the underlying SharedPreferences instance. Call once at app
   /// startup before reading or writing preferences.
@@ -77,6 +79,15 @@ class UserPreferencesService {
     } else {
       await _prefs!.remove(_kAlarmSoundUri);
     }
+  }
+
+  /// The saved appearance. Missing or unknown values stay on Midnight.
+  TwinceThemeId get appTheme =>
+      TwinceThemeIdX.fromStorage(_prefs?.getString(_kAppTheme));
+
+  Future<void> saveAppTheme(TwinceThemeId theme) async {
+    if (_prefs == null) return;
+    await _prefs!.setString(_kAppTheme, theme.storageKey);
   }
 
   /// Clears the saved alarm preference (e.g. on sign-out or reset).

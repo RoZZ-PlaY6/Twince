@@ -174,15 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         const Padding(
                           padding: EdgeInsets.only(left: 18),
-                          child: Text(
-                            'TWINCE',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2.4,
-                              color: AppTheme.cyan,
-                              fontSize: 17,
-                            ),
-                          ),
+                          child: _TwinceWordmark(),
                         ),
                         Expanded(
                           child: SingleChildScrollView(
@@ -667,6 +659,104 @@ class _RecurringOccurrences {
   final List<Task> occurrences;
 }
 
+class _TwinceWordmark extends StatefulWidget {
+  const _TwinceWordmark();
+
+  @override
+  State<_TwinceWordmark> createState() => _TwinceWordmarkState();
+}
+
+class _TwinceWordmarkState extends State<_TwinceWordmark>
+    with SingleTickerProviderStateMixin {
+  static const _label = Text(
+    'TWINCE',
+    style: TextStyle(
+      fontWeight: FontWeight.w900,
+      letterSpacing: 2.4,
+      fontSize: 17,
+      color: Colors.white,
+      shadows: [
+        Shadow(color: Color(0x73FFFFFF), blurRadius: 3.5),
+      ],
+    ),
+  );
+
+  late final AnimationController _cycle;
+  bool? _reduceMotion;
+
+  @override
+  void initState() {
+    super.initState();
+    _cycle = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 9),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduce = MediaQuery.disableAnimationsOf(context);
+    if (_reduceMotion == reduce) return;
+    _reduceMotion = reduce;
+    if (reduce) {
+      _cycle.stop();
+      _cycle.value = 0;
+    } else if (!_cycle.isAnimating) {
+      _cycle.repeat();
+    }
+  }
+
+  Shader _shader(Rect bounds) {
+    if (_reduceMotion == true) {
+      return const LinearGradient(
+        colors: [AppTheme.cyan, AppTheme.blue],
+      ).createShader(bounds);
+    }
+    return LinearGradient(
+      colors: const [
+        AppTheme.cyan,
+        AppTheme.purple,
+        AppTheme.blue,
+        AppTheme.cyan,
+      ],
+      tileMode: TileMode.repeated,
+      transform: _WordmarkShift(_cycle.value),
+    ).createShader(bounds);
+  }
+
+  @override
+  void dispose() {
+    _cycle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _cycle,
+        builder: (context, child) => ShaderMask(
+          blendMode: BlendMode.srcIn,
+          shaderCallback: _shader,
+          child: child,
+        ),
+        child: _label,
+      ),
+    );
+  }
+}
+
+class _WordmarkShift extends GradientTransform {
+  const _WordmarkShift(this.turns);
+
+  final double turns;
+
+  @override
+  Matrix4? transform(Rect bounds, {TextDirection? textDirection}) =>
+      Matrix4.translationValues(-bounds.width * turns, 0, 0);
+}
+
 class _NeonWavePainter extends CustomPainter {
   const _NeonWavePainter();
 
@@ -686,46 +776,6 @@ class _NeonWavePainter extends CustomPainter {
         ),
       );
     canvas.drawRect(Offset.zero & size, ambient);
-
-    void wave({
-      required double y,
-      required Color color,
-      required double bend,
-      required double width,
-    }) {
-      final path = Path()
-        ..moveTo(-size.width * 0.08, y)
-        ..cubicTo(
-          size.width * 0.18,
-          y - bend,
-          size.width * 0.48,
-          y + bend,
-          size.width * 1.08,
-          y - bend * 0.45,
-        );
-      canvas.drawPath(
-        path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = width * 7
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24)
-          ..color = color.withValues(alpha: 0.08),
-      );
-      canvas.drawPath(
-        path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = width
-          ..color = color.withValues(alpha: 0.65),
-      );
-    }
-
-    wave(
-      y: size.height * 0.2,
-      color: AppTheme.cyan,
-      bend: size.height * 0.08,
-      width: 0.7,
-    );
   }
 
   @override

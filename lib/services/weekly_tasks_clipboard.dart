@@ -2,11 +2,15 @@ import 'package:flutter/services.dart';
 
 import 'weekly_task_service.dart';
 
-/// One line per weekly goal, using its current week's progress.
-String formatWeeklyTasks(Iterable<WeeklyTask> tasks) => tasks
-    .map((task) =>
-        '${task.title.replaceAll(RegExp(r'[\r\n]+'), ' ').trim()}: ${task.doneThisWeek} / ${task.targetPerWeek}')
-    .join('\n');
+/// The heading is the category name, or `All` when every weekly task is copied.
+String formatWeeklyTasks(Iterable<WeeklyTask> tasks,
+    {required String heading}) {
+  final lines = tasks.map((task) =>
+      '${task.title.replaceAll(RegExp(r'[\r\n]+'), ' ').trim()}: ${task.doneThisWeek} / ${task.targetPerWeek}');
+  return [heading.trim(), ...lines].join('\n');
+}
 
-Future<void> copyWeeklyTasks(List<WeeklyTask> tasks) =>
-    Clipboard.setData(ClipboardData(text: formatWeeklyTasks(tasks)));
+Future<void> copyWeeklyTasks(List<WeeklyTask> tasks,
+        {required String heading}) =>
+    Clipboard.setData(
+        ClipboardData(text: formatWeeklyTasks(tasks, heading: heading)));
