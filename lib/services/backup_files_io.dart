@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import 'backup_policy.dart';
+
 Future<Directory> _backupDirectory() async {
   final root = await getApplicationDocumentsDirectory();
   final directory =
@@ -31,9 +33,15 @@ Future<String?> renameBackupCopy(String? path, String newName) async {
         File('${current.parent.path}${Platform.pathSeparator}$newName');
     if (!await current.exists()) return null;
     if (current.path == next.path) return current.path;
-    if (await next.exists()) return null;
+    if (await next.exists()) {
+      throw const BackupNameException(
+        'A backup file with that name already exists.',
+      );
+    }
     final renamed = await current.rename(next.path);
     return renamed.path;
+  } on BackupNameException {
+    rethrow;
   } catch (_) {
     return null;
   }

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.provider.Settings
 import androidx.core.content.FileProvider
@@ -70,6 +71,24 @@ class MainActivity : FlutterActivity() {
                             )
                         }
                         startActivityForResult(intent, 42)
+                    }
+                    "renameBackup" -> {
+                        val uriText = call.argument<String>("uri")
+                        val name = call.argument<String>("name")
+                        if (uriText.isNullOrBlank() || name.isNullOrBlank()) {
+                            result.success(null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            val renamed = DocumentsContract.renameDocument(
+                                contentResolver,
+                                Uri.parse(uriText),
+                                name,
+                            )
+                            result.success(renamed?.toString())
+                        } catch (error: Exception) {
+                            result.success(null)
+                        }
                     }
                     "writeBackup" -> {
                         val uriText = call.argument<String>("uri")

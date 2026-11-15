@@ -421,4 +421,39 @@ void main() {
     expect(find.text('failed'), findsNothing);
     expect(find.text('0/1 completed'), findsNothing);
   });
+
+  testWidgets('analytics stays within a narrow phone viewport', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final today = DateTime.now();
+    final day = DateTime(today.year, today.month, today.day);
+    await tester.pumpWidget(MultiProvider(
+      providers: [
+        ChangeNotifierProvider<WeeklyTaskService>.value(
+            value: _WeeklyStorage(const [])),
+        ChangeNotifierProvider<StorageService>.value(
+          value: _AnalyticsStorage([
+            analyticsTask(
+                'A very long analytics task title that must stay inside the card',
+                day,
+                TaskStatus.pending,
+                id: 'long'),
+          ]),
+        ),
+      ],
+      child: const MaterialApp(home: AnalyticsScreen()),
+    ));
+    await tester.pump();
+    expect(find.text('Analytics'), findsOneWidget);
+    expect(find.text('Weekly'), findsOneWidget);
+    expect(find.text('Custom Date'), findsOneWidget);
+    expect(find.text('نمودار ستونی / میله‌ای'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Weekly tasks'));
+    await tester.pump();
+    expect(find.text('No weekly tasks yet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

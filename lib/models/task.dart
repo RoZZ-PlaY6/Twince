@@ -32,12 +32,11 @@ enum NotificationTimerOption {
 extension NotificationTimerOptionX on NotificationTimerOption {
   String get label => switch (this) {
         NotificationTimerOption.everyHour => 'Every hour',
-        NotificationTimerOption.thirtyMinutes => '30 minutes before the end',
-        NotificationTimerOption.fifteenMinutes => '15 minutes before the end',
-        NotificationTimerOption.tenMinutes => '10 minutes before the end',
-        NotificationTimerOption.fiveMinutes => '5 minutes before the end',
-        NotificationTimerOption.fiveTimes =>
-          '5x (last 5 minutes, every minute)',
+        NotificationTimerOption.thirtyMinutes => '30m',
+        NotificationTimerOption.fifteenMinutes => '15m',
+        NotificationTimerOption.tenMinutes => '10m',
+        NotificationTimerOption.fiveMinutes => '5m',
+        NotificationTimerOption.fiveTimes => '5x (every min)',
       };
 
   String get description => switch (this) {

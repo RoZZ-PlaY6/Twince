@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../models/task.dart';
 import '../theme/app_theme.dart';
+import 'material_icon.dart';
 
 class TaskCard extends StatefulWidget {
   const TaskCard({
@@ -95,7 +96,9 @@ class _TaskCardState extends State<TaskCard> {
         ? AppTheme.failed
         : complete
             ? AppTheme.completed
-            : AppTheme.cyan;
+            : AppTheme.isChristmas(context)
+                ? const Color(0xFF67D5FF)
+                : AppTheme.cyan;
     final now = DateTime.now();
     final active = task.status == TaskStatus.pending &&
         task.isTimeBound &&
@@ -116,7 +119,9 @@ class _TaskCardState extends State<TaskCard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: const Color(0xC4102139),
+        color: AppTheme.isChristmas(context)
+            ? const Color(0xE6211344)
+            : const Color(0xC4102139),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: accent.withValues(alpha: 0.9),
@@ -145,7 +150,8 @@ class _TaskCardState extends State<TaskCard> {
                 if (failed)
                   const Padding(
                     padding: EdgeInsets.only(top: 9, right: 12),
-                    child: Icon(Icons.close_rounded, color: AppTheme.failed),
+                    child: MaterialIcon(Icons.close_rounded,
+                        color: AppTheme.failed),
                   )
                 else
                   Checkbox(
@@ -210,7 +216,7 @@ class _TaskCardState extends State<TaskCard> {
                         tooltip: failed ? 'Retry / Reschedule' : 'Edit task',
                         visualDensity: VisualDensity.compact,
                         onPressed: widget.onEdit,
-                        icon: Icon(
+                        icon: MaterialIcon(
                             failed ? Icons.replay_rounded : Icons.edit_outlined,
                             color: failed ? AppTheme.purple : AppTheme.cyan),
                       ),
@@ -218,7 +224,7 @@ class _TaskCardState extends State<TaskCard> {
                       tooltip: 'Delete task',
                       visualDensity: VisualDensity.compact,
                       onPressed: widget.onDelete,
-                      icon: const Icon(Icons.delete_outline),
+                      icon: const MaterialIcon(Icons.delete_outline),
                     ),
                   ],
                 ),

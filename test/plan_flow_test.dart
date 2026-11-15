@@ -29,6 +29,42 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Day of week'), findsOneWidget);
     expect(find.text('Weeks'), findsOneWidget);
+    expect(find.text('Z / F weeks'), findsOneWidget);
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    expect(find.text('Z · Even · هفته زوج'), findsWidgets);
+    expect(find.text('F · Odd · هفته فرد'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ETC uses the same day menu and Z even / F odd labels',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.dark,
+      home: Scaffold(
+        body: Builder(
+            builder: (context) => TextButton(
+                  onPressed: () => showAddPlanFlow(context),
+                  child: const Text('Open plans'),
+                )),
+      ),
+    ));
+    await tester.tap(find.text('Open plans'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ETC'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add ETC Plan'), findsOneWidget);
+    await tester.tap(find.text('Add task to day'));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose a day'), findsOneWidget);
+    expect(find.text('Z / F weeks'), findsOneWidget);
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    expect(find.text('Z · Even · هفته زوج'), findsWidgets);
+    expect(find.text('F · Odd · هفته فرد'), findsWidgets);
+    expect(find.text('Next: task details'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

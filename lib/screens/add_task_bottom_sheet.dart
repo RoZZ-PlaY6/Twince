@@ -513,7 +513,9 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
         prefixIcon:
             icon == null ? null : Icon(icon, color: AppTheme.purple, size: 21),
         filled: true,
-        fillColor: const Color(0xB5122344),
+        fillColor: AppTheme.isChristmas(context)
+            ? const Color(0xD92D1C50)
+            : const Color(0xB5122344),
         labelStyle: const TextStyle(color: Colors.white70),
         hintStyle: const TextStyle(color: Colors.white38),
         enabledBorder: OutlineInputBorder(
@@ -539,12 +541,16 @@ class _AddTaskBottomSheetState extends State<AddTaskBottomSheet> {
 
   @override
   Widget build(BuildContext context) => Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF071126),
+        decoration: BoxDecoration(
+          color: AppTheme.isChristmas(context)
+              ? const Color(0xFF120D27)
+              : const Color(0xFF071126),
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF0B1A3A), Color(0xFF070D22)],
+            colors: AppTheme.isChristmas(context)
+                ? const [Color(0xFF211344), Color(0xFF142D62)]
+                : const [Color(0xFF0B1A3A), Color(0xFF070D22)],
           ),
         ),
         child: Padding(

@@ -6,6 +6,7 @@ import 'package:twince/models/task.dart';
 import 'package:twince/screens/home_screen.dart';
 import 'package:twince/screens/settings_screen.dart';
 import 'package:twince/services/storage_service.dart';
+import 'package:twince/theme/twince_theme.dart';
 
 class _TaskStore extends ChangeNotifier implements StorageService {
   @override
@@ -42,21 +43,24 @@ void main() {
         child: const MaterialApp(home: HomeScreen()),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
     final settingsCenter = tester.getCenter(find.text('Settings'));
     final tasksCenter = tester.getCenter(find.text('Tasks'));
     expect(settingsCenter.dx, lessThan(tasksCenter.dx));
 
     await tester.tap(find.text('Settings'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.byType(SettingsScreen), findsOneWidget);
     expect(find.text('Version 2.3.4'), findsOneWidget);
     expect(find.text('© 2026. All rights reserved.'), findsOneWidget);
 
     await tester.tap(find.text('Tasks'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.byType(SettingsScreen), findsNothing);
     expect(find.text('No active tasks yet'), findsOneWidget);
@@ -76,6 +80,53 @@ void main() {
 
     expect(find.text('Version 2.3.4'), findsOneWidget);
     expect(find.text('© 2026. All rights reserved.'), findsOneWidget);
+    expect(find.text('Theme'), findsOneWidget);
+    expect(find.text('Midnight'), findsOneWidget);
+    expect(find.text('تغییر'), findsNothing);
+    expect(
+      tester.getCenter(find.text('Theme')).dy,
+      lessThan(tester.getCenter(find.text('Settings')).dy),
+    );
+    final swatch = tester.widget<Container>(find.descendant(
+      of: find.byKey(const ValueKey('midnight-theme-swatch')),
+      matching: find.byType(Container),
+    ));
+    final swatchDecoration = swatch.decoration! as BoxDecoration;
+    expect(swatchDecoration.color, TwinceThemeId.midnight.swatch);
+    expect(swatchDecoration.shape, BoxShape.circle);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Midnight'));
+    await tester.pumpAndSettle();
+    expect(find.text('Theme'), findsOneWidget);
+    expect(find.byIcon(Icons.check_rounded), findsWidgets);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('Midnight'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('theme options share a row when wide and wrap when narrow',
+      (tester) async {
+    Widget app(double width) => MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: width,
+                child: const ThemeOptionsLayout(children: [
+                  SizedBox(key: ValueKey('first'), height: 48),
+                  SizedBox(key: ValueKey('second'), height: 48),
+                ]),
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(app(420));
+    expect(tester.getTopLeft(find.byKey(const ValueKey('first'))).dy,
+        tester.getTopLeft(find.byKey(const ValueKey('second'))).dy);
+    await tester.pumpWidget(app(180));
+    expect(tester.getTopLeft(find.byKey(const ValueKey('second'))).dy,
+        greaterThan(tester.getTopLeft(find.byKey(const ValueKey('first'))).dy));
     expect(tester.takeException(), isNull);
   });
 }
