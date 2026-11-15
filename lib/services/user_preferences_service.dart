@@ -29,7 +29,7 @@ bool canUseRememberedAlarmTone(SavedAlarmPreference selection) {
 ///
 /// This is intentionally separate from Hive task models and TypeAdapters so
 /// that alarm-tone history does not leak into persisted task records.
-class UserPreferencesService {
+class UserPreferencesService extends ChangeNotifier {
   UserPreferencesService._();
 
   static final UserPreferencesService instance = UserPreferencesService._();
@@ -88,6 +88,7 @@ class UserPreferencesService {
   Future<void> saveAppTheme(TwinceThemeId theme) async {
     if (_prefs == null) return;
     await _prefs!.setString(_kAppTheme, theme.storageKey);
+    notifyListeners();
   }
 
   /// Clears the saved alarm preference (e.g. on sign-out or reset).

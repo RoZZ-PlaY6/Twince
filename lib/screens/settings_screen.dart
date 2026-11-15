@@ -23,14 +23,108 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   TwinceThemeId get _theme => UserPreferencesService.instance.appTheme;
 
-  Future<void> _chooseTheme() async {
-    final picked = await showDialog<TwinceThemeId>(
-      context: context,
-      builder: (dialogContext) => _ThemeSelectorDialog(selected: _theme),
-    );
-    if (picked == null) return;
-    await UserPreferencesService.instance.saveAppTheme(picked);
+  Future<void> _selectTheme(TwinceThemeId theme) async {
+    await UserPreferencesService.instance.saveAppTheme(theme);
     if (mounted) setState(() {});
+  }
+
+  Widget _themeSection(String title, TwinceThemeCategory category) {
+    final themes =
+        TwinceThemeId.values.where((theme) => theme.category == category);
+    return DecoratedBox(
+      key: ValueKey('theme-section-${category.name}'),
+      decoration: BoxDecoration(
+        color: AppTheme.isChristmas(context)
+            ? const Color(0xFF211344)
+            : const Color(0xFF0B1738),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.cyan.withValues(alpha: 0.85)),
+        boxShadow: [
+          BoxShadow(
+              color: AppTheme.cyan.withValues(alpha: 0.14), blurRadius: 16),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                )),
+            const SizedBox(height: 12),
+            ThemeOptionsLayout(
+              children: [for (final theme in themes) _themeOption(theme)],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _themeOption(TwinceThemeId theme) {
+    final selected = _theme == theme;
+    void select() => _selectTheme(theme);
+    return Semantics(
+      label: '${theme.label} theme',
+      button: true,
+      enabled: true,
+      selected: selected,
+      onTap: select,
+      excludeSemantics: true,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: ValueKey('theme-option-${theme.storageKey}'),
+          onTap: select,
+          excludeFromSemantics: true,
+          borderRadius: BorderRadius.circular(14),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: AppTheme.isChristmas(context)
+                  ? const Color(0xFF302052)
+                  : const Color(0xFF121C36),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected
+                    ? AppTheme.cyan
+                    : AppTheme.cyan.withValues(alpha: 0.35),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(children: [
+                Expanded(
+                    child: Text(theme.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ))),
+                const SizedBox(width: 10),
+                _ThemeSwatch(
+                  key: ValueKey('${theme.storageKey}-theme-swatch'),
+                  color: theme.swatch,
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: selected
+                      ? const Icon(Icons.check_rounded, color: AppTheme.cyan)
+                      : null,
+                ),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _loadVersion() async {
@@ -62,84 +156,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0B1738),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: AppTheme.cyan.withValues(alpha: 0.85),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.cyan.withValues(alpha: 0.14),
-                      blurRadius: 16,
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text(
-                        'Theme',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _chooseTheme,
-                          borderRadius: BorderRadius.circular(14),
-                          child: Ink(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF121C36),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: AppTheme.cyan),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 12),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    _theme.label,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  _ThemeSwatch(
-                                    key:
-                                        const ValueKey('midnight-theme-swatch'),
-                                    color: _theme.swatch,
-                                  ),
-                                  const Spacer(),
-                                  const Icon(Icons.check_rounded,
-                                      color: AppTheme.cyan),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              _themeSection('Theme', TwinceThemeCategory.standard),
+              const SizedBox(height: 16),
+              _themeSection('Special Theme', TwinceThemeCategory.special),
               const SizedBox(height: 16),
               Container(
                 width: double.infinity,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
                 decoration: BoxDecoration(
-                  color: const Color(0xF20B1738),
+                  color: AppTheme.isChristmas(context)
+                      ? const Color(0xF2211344)
+                      : const Color(0xF20B1738),
                   borderRadius: BorderRadius.circular(18),
                   border:
                       Border.all(color: AppTheme.cyan.withValues(alpha: 0.7)),
@@ -201,15 +229,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 class _ThemeSwatch extends StatelessWidget {
-  const _ThemeSwatch({super.key, required this.color, this.size = 18});
+  const _ThemeSwatch({super.key, required this.color});
 
   final Color color;
-  final double size;
-
   @override
   Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
+        width: 18,
+        height: 18,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
@@ -218,42 +244,27 @@ class _ThemeSwatch extends StatelessWidget {
       );
 }
 
-class _ThemeSelectorDialog extends StatelessWidget {
-  const _ThemeSelectorDialog({required this.selected});
+/// Wraps options at small widths without changing size when selection changes.
+@visibleForTesting
+class ThemeOptionsLayout extends StatelessWidget {
+  const ThemeOptionsLayout({super.key, required this.children});
 
-  final TwinceThemeId selected;
+  final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: const Color(0xFF0B1738),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: const BorderSide(color: Color(0xFF22D3EE)),
-      ),
-      title: const Text('Theme'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final theme in TwinceThemeId.values)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(theme.label),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _ThemeSwatch(color: theme.swatch, size: 22),
-                  if (theme == selected) ...[
-                    const SizedBox(width: 8),
-                    const Icon(Icons.check_rounded, color: AppTheme.cyan),
-                  ],
-                ],
-              ),
-              selected: theme == selected,
-              onTap: () => Navigator.pop(context, theme),
-            ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          const gap = 12.0;
+          final columns =
+              ((constraints.maxWidth + gap) / 192).floor().clamp(1, 3);
+          final width = (constraints.maxWidth - (columns - 1) * gap) / columns;
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: [
+              for (final child in children) SizedBox(width: width, child: child)
+            ],
+          );
+        },
+      );
 }

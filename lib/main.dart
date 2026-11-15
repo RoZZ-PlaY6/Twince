@@ -16,6 +16,7 @@ import 'services/week_cycle_service.dart';
 import 'services/weekly_task_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/twince_theme.dart';
+import 'theme/christmas_background.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -153,11 +154,22 @@ class _TwinceAppState extends State<TwinceApp> with WidgetsBindingObserver {
           ChangeNotifierProvider.value(value: widget.weekCycle),
           ChangeNotifierProvider.value(value: widget.weeklyTasks),
         ],
-        child: MaterialApp(
-          title: 'Twince',
-          debugShowCheckedModeBanner: false,
-          theme: UserPreferencesService.instance.appTheme.themeData,
-          home: const HomeScreen(),
+        child: ListenableBuilder(
+          listenable: UserPreferencesService.instance,
+          builder: (context, _) => MaterialApp(
+            title: 'Twince',
+            debugShowCheckedModeBanner: false,
+            theme: UserPreferencesService.instance.appTheme.themeData,
+            builder: (context, child) =>
+                UserPreferencesService.instance.appTheme ==
+                        TwinceThemeId.christmas
+                    ? Stack(fit: StackFit.expand, children: [
+                        const ChristmasBackground(),
+                        if (child != null) child,
+                      ])
+                    : child ?? const SizedBox.shrink(),
+            home: const HomeScreen(),
+          ),
         ),
       );
 }

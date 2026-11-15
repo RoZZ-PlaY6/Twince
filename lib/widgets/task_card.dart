@@ -96,7 +96,9 @@ class _TaskCardState extends State<TaskCard> {
         ? AppTheme.failed
         : complete
             ? AppTheme.completed
-            : AppTheme.cyan;
+            : AppTheme.isChristmas(context)
+                ? const Color(0xFF67D5FF)
+                : AppTheme.cyan;
     final now = DateTime.now();
     final active = task.status == TaskStatus.pending &&
         task.isTimeBound &&
@@ -117,7 +119,9 @@ class _TaskCardState extends State<TaskCard> {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: const Color(0xC4102139),
+        color: AppTheme.isChristmas(context)
+            ? const Color(0xE6211344)
+            : const Color(0xC4102139),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: accent.withValues(alpha: 0.9),

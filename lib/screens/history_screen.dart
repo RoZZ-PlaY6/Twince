@@ -96,7 +96,7 @@ class _HistoryTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: AppTheme.neonCard(accent: color),
+      decoration: AppTheme.neonCard(context: context, accent: color),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(

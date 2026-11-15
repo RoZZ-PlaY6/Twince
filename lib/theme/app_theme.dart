@@ -9,6 +9,58 @@ class AppTheme {
   static const completed = Color(0xFF10B981);
   static const failed = Color(0xFFBE5366);
 
+  static bool isChristmas(BuildContext context) =>
+      Theme.of(context).colorScheme.primary == const Color(0xFFA78BFA);
+
+  static LinearGradient sheetGradient(BuildContext context) => LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: isChristmas(context)
+            ? const [Color(0xF2211344), Color(0xF7120D27)]
+            : const [Color(0xF20B1738), Color(0xF7071028)],
+      );
+
+  static ThemeData get christmas {
+    final base = dark;
+    const background = Color(0xFF120D27);
+    const surface = Color(0xFF211344);
+    const primary = Color(0xFFA78BFA);
+    const secondary = Color(0xFF67D5FF);
+    const text = Color(0xFFF6F3FF);
+    const muted = Color(0xFFC9C4E3);
+    final scheme = base.colorScheme.copyWith(
+      primary: primary,
+      onPrimary: background,
+      secondary: secondary,
+      onSecondary: background,
+      surface: surface,
+      onSurface: text,
+      onSurfaceVariant: muted,
+    );
+    return base.copyWith(
+      colorScheme: scheme,
+      scaffoldBackgroundColor: Colors.transparent,
+      canvasColor: surface,
+      cardColor: surface,
+      textTheme: base.textTheme.apply(bodyColor: text, displayColor: text),
+      appBarTheme: base.appBarTheme.copyWith(backgroundColor: background),
+      dialogTheme: base.dialogTheme.copyWith(backgroundColor: surface),
+      inputDecorationTheme: base.inputDecorationTheme.copyWith(
+        fillColor: surface,
+        labelStyle: base.textTheme.bodyMedium?.copyWith(color: muted),
+        hintStyle: base.textTheme.bodyMedium?.copyWith(color: muted),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: secondary, width: 1.5),
+        ),
+      ),
+      floatingActionButtonTheme: base.floatingActionButtonTheme.copyWith(
+        backgroundColor: primary,
+        foregroundColor: background,
+      ),
+    );
+  }
+
   // Font families
   static const String englishFontFamily = 'Inter';
   static const String persianFontFamily = 'Vazirmatn';
@@ -113,8 +165,12 @@ class AppTheme {
     );
   }
 
-  static BoxDecoration neonCard({Color accent = purple}) => BoxDecoration(
-        color: surface,
+  static BoxDecoration neonCard(
+          {Color accent = purple, BuildContext? context}) =>
+      BoxDecoration(
+        color: context != null && isChristmas(context)
+            ? const Color(0xFF211344)
+            : surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: accent.withValues(alpha: 0.7)),
         boxShadow: [

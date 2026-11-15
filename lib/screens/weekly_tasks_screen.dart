@@ -187,12 +187,8 @@ class _WeeklyTaskSheetState extends State<_WeeklyTaskSheet> {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
         child: DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xF20B1738), Color(0xF7071028)],
-            ),
+          decoration: BoxDecoration(
+            gradient: AppTheme.sheetGradient(context),
           ),
           child: Padding(
             padding: EdgeInsets.fromLTRB(
@@ -736,7 +732,8 @@ class _WeeklyTasksScreenState extends State<WeeklyTasksScreen> {
               Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Container(
-                    decoration: AppTheme.neonCard(accent: AppTheme.cyan),
+                    decoration: AppTheme.neonCard(
+                        context: context, accent: AppTheme.cyan),
                     padding: const EdgeInsets.all(16),
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

@@ -13,7 +13,9 @@ Future<BackupSaveChoice?> showBackupSaveDialog(
   return showDialog<BackupSaveChoice>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      backgroundColor: const Color(0xFF0A1734),
+      backgroundColor: AppTheme.isChristmas(dialogContext)
+          ? const Color(0xFF211344)
+          : const Color(0xFF0A1734),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
         side: BorderSide(color: AppTheme.cyan.withValues(alpha: 0.7)),
@@ -62,7 +64,9 @@ Future<String?> showBackupNameDialog(
   final result = await showDialog<String>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      backgroundColor: const Color(0xFF0A1734),
+      backgroundColor: AppTheme.isChristmas(dialogContext)
+          ? const Color(0xFF211344)
+          : const Color(0xFF0A1734),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
         side: BorderSide(color: AppTheme.purple.withValues(alpha: 0.7)),

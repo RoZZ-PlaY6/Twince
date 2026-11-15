@@ -56,11 +56,7 @@ class _PlanTypeSheet extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xF20B1738), Color(0xF7071028)],
-              ),
+              gradient: AppTheme.sheetGradient(context),
               border: Border(
                 top: BorderSide(color: AppTheme.blue.withValues(alpha: 0.7)),
               ),
@@ -307,6 +303,7 @@ class PlanScreen extends StatelessWidget {
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: AppTheme.neonCard(
+                    context: context,
                     accent: plan.university ? AppTheme.cyan : AppTheme.purple),
                 child: ExpansionTile(
                   leading: Icon(
@@ -414,7 +411,7 @@ class PlanWeekBanner extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.fromLTRB(16, 4, 4, 4),
-      decoration: AppTheme.neonCard(accent: AppTheme.cyan),
+      decoration: AppTheme.neonCard(context: context, accent: AppTheme.cyan),
       child: Row(children: [
         Expanded(
           child: Text(
@@ -704,12 +701,8 @@ class _PlanEditorState extends State<_PlanEditor> {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: DecoratedBox(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xF20B1738), Color(0xF7071028)],
-              ),
+            decoration: BoxDecoration(
+              gradient: AppTheme.sheetGradient(context),
             ),
             child: ConstrainedBox(
               constraints: BoxConstraints(
@@ -983,11 +976,7 @@ class _PlanEntryDialogState extends State<_PlanEntryDialog> {
           filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xF20B1738), Color(0xF7071028)],
-              ),
+              gradient: AppTheme.sheetGradient(context),
               border: Border.all(color: AppTheme.blue.withValues(alpha: 0.7)),
               borderRadius: BorderRadius.circular(24),
             ),

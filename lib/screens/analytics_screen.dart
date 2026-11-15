@@ -233,11 +233,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     return Scaffold(
-      backgroundColor: _analyticsNight,
+      backgroundColor:
+          AppTheme.isChristmas(context) ? Colors.transparent : _analyticsNight,
       appBar: widget.embedded
           ? null
           : AppBar(
-              backgroundColor: _analyticsNight,
+              backgroundColor: AppTheme.isChristmas(context)
+                  ? const Color(0xB3120D27)
+                  : _analyticsNight,
               surfaceTintColor: Colors.transparent,
               elevation: 0,
               scrolledUnderElevation: 0,
@@ -636,13 +639,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xE6121C36), Color(0xD60B1224)],
+                colors: AppTheme.isChristmas(context)
+                    ? const [Color(0xE6211344), Color(0xD6142D62)]
+                    : const [Color(0xE6121C36), Color(0xD60B1224)],
               ),
               borderRadius: BorderRadius.circular(radius),
-              border: Border.all(color: const Color(0x663E6F9E)),
+              border: Border.all(
+                color: AppTheme.isChristmas(context)
+                    ? const Color(0x66A78BFA)
+                    : const Color(0x663E6F9E),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: AppTheme.cyan.withValues(alpha: 0.05),

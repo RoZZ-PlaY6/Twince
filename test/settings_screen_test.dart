@@ -98,11 +98,35 @@ void main() {
 
     await tester.tap(find.text('Midnight'));
     await tester.pumpAndSettle();
-    expect(find.text('Theme'), findsWidgets);
+    expect(find.text('Theme'), findsOneWidget);
     expect(find.byIcon(Icons.check_rounded), findsWidgets);
-    await tester.tap(find.text('Midnight').last);
-    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
     expect(find.text('Midnight'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('theme options share a row when wide and wrap when narrow',
+      (tester) async {
+    Widget app(double width) => MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: width,
+                child: const ThemeOptionsLayout(children: [
+                  SizedBox(key: ValueKey('first'), height: 48),
+                  SizedBox(key: ValueKey('second'), height: 48),
+                ]),
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(app(420));
+    expect(tester.getTopLeft(find.byKey(const ValueKey('first'))).dy,
+        tester.getTopLeft(find.byKey(const ValueKey('second'))).dy);
+    await tester.pumpWidget(app(180));
+    expect(tester.getTopLeft(find.byKey(const ValueKey('second'))).dy,
+        greaterThan(tester.getTopLeft(find.byKey(const ValueKey('first'))).dy));
     expect(tester.takeException(), isNull);
   });
 }
