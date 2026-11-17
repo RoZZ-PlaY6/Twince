@@ -16,17 +16,34 @@ class _TaskStore extends ChangeNotifier implements StorageService {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-void _mockPackageInfo() {
+void _mockPackageInfo({String version = '2.3.4', String buildNumber = '7'}) {
   PackageInfo.setMockInitialValues(
     appName: 'Twince',
     packageName: 'com.twince.app',
-    version: '2.3.4',
-    buildNumber: '7',
+    version: version,
+    buildNumber: buildNumber,
     buildSignature: '',
   );
 }
 
 void main() {
+  testWidgets('Settings formats the package build code below the version',
+      (tester) async {
+    _mockPackageInfo(version: '1.1.3', buildNumber: '11');
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: SettingsScreen())),
+    );
+    await tester.pumpAndSettle();
+    final version = find.text('Version 1.1.3');
+    final build = find.text('Build number: 1.1');
+    expect(version, findsOneWidget);
+    expect(build, findsOneWidget);
+    expect(tester.getTopLeft(build).dy,
+        greaterThan(tester.getTopLeft(version).dy));
+    expect(tester.widget<Text>(build).style!.fontSize,
+        lessThan(tester.widget<Text>(version).style!.fontSize!));
+  });
+
   testWidgets('Settings sits left of Tasks and opens with the package version',
       (tester) async {
     _mockPackageInfo();

@@ -6,11 +6,13 @@ import 'package:provider/provider.dart';
 
 import '../models/task.dart';
 import '../services/browser_notification.dart';
+import '../services/backup_library.dart';
 import '../services/export_service.dart';
 import '../services/notification_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/material_icon.dart';
+import '../widgets/history_record_icon.dart';
 import '../widgets/task_card.dart';
 import '../widgets/test_notification_dialog.dart';
 import '../widgets/export_backup_button.dart';
@@ -46,6 +48,22 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey _addTaskButtonKey = GlobalKey();
   int _destination = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await BackupLibrary.instance.ensureAndroidFolder();
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$error')),
+          );
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) => DefaultTabController(
@@ -292,12 +310,12 @@ class _HomeScreenState extends State<HomeScreen> {
           tooltip: 'Export Data',
           visualDensity: VisualDensity.compact,
           icon: const MaterialIcon(Icons.backup_outlined, color: AppTheme.cyan),
-          onPressed: _exportData,
+          onPressed: () => openExportBackup(context, onExport: _exportData),
         ),
         IconButton(
           tooltip: 'History',
           visualDensity: VisualDensity.compact,
-          icon: const MaterialIcon(Icons.history, color: AppTheme.cyan),
+          icon: const HistoryRecordIcon(color: AppTheme.cyan),
           onPressed: () => Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => const HistoryScreen()),
           ),
@@ -614,14 +632,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _exportData() async {
-    final storage = context.read<StorageService>();
-    final result = await ExportService.instance.exportAndShare(storage);
+    String message;
+    try {
+      final storage = context.read<StorageService>();
+      final result = await ExportService.instance.exportAndShare(storage);
+      message = switch (result.status) {
+        ExportStatus.shared => 'Backup created and shared.',
+        ExportStatus.noData => 'No data to back up.',
+        ExportStatus.unavailable => 'Export is unavailable on this platform.',
+      };
+    } catch (error) {
+      message = 'Backup failed: $error';
+    }
     if (!mounted) return;
-    final message = switch (result.status) {
-      ExportStatus.shared => 'Backup created and shared.',
-      ExportStatus.noData => 'No data to back up.',
-      ExportStatus.unavailable => 'Export is unavailable on this platform.',
-    };
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
   }

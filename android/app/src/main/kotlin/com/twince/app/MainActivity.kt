@@ -18,9 +18,12 @@ import java.io.File
 class MainActivity : FlutterActivity() {
     private var importResult: MethodChannel.Result? = null
     private var alarmPickerResult: MethodChannel.Result? = null
+    private val backupFolder by lazy { BackupFolder(this) }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "twince/backup_folder")
+            .setMethodCallHandler { call, result -> backupFolder.handle(call, result) }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "twince/export")
             .setMethodCallHandler { call, result ->
                 if (call.method != "shareFile") {
@@ -35,13 +38,10 @@ class MainActivity : FlutterActivity() {
                     return@setMethodCallHandler
                 }
                 try {
-                    val file = File(path)
-                    val authority = "${applicationContext.packageName}.fileprovider"
-                    val uri = FileProvider.getUriForFile(
-                        this,
-                        authority,
-                        file,
-                    )
+                    val uri = if (path.startsWith("content://")) Uri.parse(path) else {
+                        val authority = "${applicationContext.packageName}.fileprovider"
+                        FileProvider.getUriForFile(this, authority, File(path))
+                    }
                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                         type = mimeType
                         putExtra(Intent.EXTRA_STREAM, uri)
@@ -187,6 +187,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (backupFolder.onResult(requestCode, resultCode, data)) return
         if (requestCode == REQUEST_SYSTEM_SOUND || requestCode == REQUEST_CUSTOM_AUDIO) {
             val result = alarmPickerResult
             alarmPickerResult = null

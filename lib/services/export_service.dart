@@ -119,7 +119,7 @@ class ExportService {
       name: timestampedBackupName(DateTime.now()),
       contents: contents,
     );
-    return shareExisting(created.path, created.name);
+    return shareExisting(created.sourceUri ?? created.path, created.name);
   }
 
   Future<ExportResult> shareExisting(String? path, String fileName) async {

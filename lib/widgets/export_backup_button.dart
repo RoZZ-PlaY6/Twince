@@ -27,69 +27,32 @@ Future<void> openImportBackup(BuildContext context) {
   return _BackupActions(context).openManager();
 }
 
+Future<void> openExportBackup(BuildContext context,
+    {required Future<void> Function() onExport}) {
+  return _BackupActions(context).openExport(onExport);
+}
+
 class _ExportBackupButtonState extends State<ExportBackupButton> {
   bool _exporting = false;
   bool _importing = false;
 
   Future<void> _export() async {
     if (_exporting) return;
-    final active = await BackupLibrary.instance.current();
-    if (!mounted) return;
-    final choice = await showBackupSaveDialog(context, active: active);
-    if (choice == null || !mounted) return;
     setState(() => _exporting = true);
     try {
-      final contents = _encodeBackup(context);
-      if (contents == null) {
-        _message('No data to back up.');
-        return;
-      }
-      if (choice == BackupSaveChoice.current) {
-        await _saveCurrent(contents);
-        return;
-      }
-      await _createNew(contents);
-    } on BackupNameException catch (error) {
-      _message(error.message);
+      final result = await ExportService.instance.exportAndShare(
+        context.read<StorageService>(),
+      );
+      _message(switch (result.status) {
+        ExportStatus.shared => 'Backup created and shared.',
+        ExportStatus.noData => 'No data to back up.',
+        ExportStatus.unavailable => 'Export is unavailable on this platform.',
+      });
     } catch (_) {
       _message('Backup failed.');
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
-  }
-
-  Future<void> _saveCurrent(String contents) async {
-    final saved = await BackupLibrary.instance.saveCurrent(contents);
-    if (!mounted) return;
-    _message(
-      saved.saved
-          ? 'Updated ${saved.name}.'
-          : 'Could not update the original backup. Write access may be unavailable or expired. Import the file again or create a new backup.',
-    );
-  }
-
-  Future<void> _createNew(String contents) async {
-    final requested = await showBackupNameDialog(
-      context,
-      initialName: timestampedBackupName(DateTime.now()),
-      title: 'New backup file',
-      action: 'Create',
-    );
-    if (requested == null || !mounted) return;
-    final created = await BackupLibrary.instance.createNew(
-      name: requested,
-      contents: contents,
-    );
-    final shared =
-        await ExportService.instance.shareExisting(created.path, created.name);
-    if (!mounted) return;
-    _message(switch (shared.status) {
-      ExportStatus.shared => 'Created ${created.name}.',
-      ExportStatus.noData => 'No data to back up.',
-      ExportStatus.unavailable => created.path == null
-          ? 'This platform cannot write the backup file.'
-          : 'Saved ${created.name}. Sharing is unavailable here.',
-    });
   }
 
   void _message(String message) {
@@ -128,7 +91,9 @@ class _ExportBackupButtonState extends State<ExportBackupButton> {
         const SizedBox(width: 8),
         IconButton(
           tooltip: 'پشتیبان‌گیری / Export Data',
-          onPressed: _exporting || _importing ? null : _export,
+          onPressed: _exporting || _importing
+              ? null
+              : () => openExportBackup(context, onExport: _export),
           icon: _exporting
               ? const SizedBox(
                   width: 20,
@@ -167,13 +132,24 @@ class _BackupActions {
     await showBackupManagerSheet(
       context,
       onImport: _import,
+    );
+  }
+
+  Future<void> openExport(Future<void> Function() onExport) async {
+    await showBackupManagerSheet(
+      context,
+      onExport: onExport,
       onSaveCurrent: () async {
         final contents = _encodeBackup(context);
         if (contents == null) {
           _message('No data to back up.');
           return;
         }
-        await _saveCurrent(contents);
+        try {
+          await _saveCurrent(contents);
+        } on BackupNameException catch (error) {
+          _message(error.message);
+        }
       },
       onCreateNew: () async {
         final contents = _encodeBackup(context);
@@ -244,8 +220,14 @@ class _BackupActions {
       name: requested,
       contents: contents,
     );
-    final shared =
-        await ExportService.instance.shareExisting(created.path, created.name);
+    ExportResult shared;
+    try {
+      shared = await ExportService.instance
+          .shareExisting(created.sourceUri ?? created.path, created.name);
+    } catch (_) {
+      _message('Saved ${created.name}, but sharing could not be opened.');
+      return;
+    }
     if (!context.mounted) return;
     _message(switch (shared.status) {
       ExportStatus.shared => 'Created ${created.name}.',

@@ -98,10 +98,12 @@ Future<String?> showBackupNameDialog(
 
 Future<void> showBackupManagerSheet(
   BuildContext context, {
-  required Future<void> Function() onImport,
-  required Future<void> Function() onSaveCurrent,
-  required Future<void> Function() onCreateNew,
+  Future<void> Function()? onImport,
+  Future<void> Function()? onExport,
+  Future<void> Function()? onSaveCurrent,
+  Future<void> Function()? onCreateNew,
 }) {
+  assert((onImport != null) != (onExport != null));
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -112,18 +114,30 @@ Future<void> showBackupManagerSheet(
       borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),
     builder: (sheetContext) => _BackupManagerSheet(
-      onImport: () async {
-        Navigator.pop(sheetContext);
-        await onImport();
-      },
-      onSaveCurrent: () async {
-        Navigator.pop(sheetContext);
-        await onSaveCurrent();
-      },
-      onCreateNew: () async {
-        Navigator.pop(sheetContext);
-        await onCreateNew();
-      },
+      onImport: onImport == null
+          ? null
+          : () async {
+              Navigator.pop(sheetContext);
+              await onImport();
+            },
+      onExport: onExport == null
+          ? null
+          : () async {
+              Navigator.pop(sheetContext);
+              await onExport();
+            },
+      onSaveCurrent: onSaveCurrent == null
+          ? null
+          : () async {
+              Navigator.pop(sheetContext);
+              await onSaveCurrent();
+            },
+      onCreateNew: onCreateNew == null
+          ? null
+          : () async {
+              Navigator.pop(sheetContext);
+              await onCreateNew();
+            },
     ),
   );
 }
@@ -131,13 +145,15 @@ Future<void> showBackupManagerSheet(
 class _BackupManagerSheet extends StatefulWidget {
   const _BackupManagerSheet({
     required this.onImport,
+    required this.onExport,
     required this.onSaveCurrent,
     required this.onCreateNew,
   });
 
-  final Future<void> Function() onImport;
-  final Future<void> Function() onSaveCurrent;
-  final Future<void> Function() onCreateNew;
+  final Future<void> Function()? onImport;
+  final Future<void> Function()? onExport;
+  final Future<void> Function()? onSaveCurrent;
+  final Future<void> Function()? onCreateNew;
 
   @override
   State<_BackupManagerSheet> createState() => _BackupManagerSheetState();
@@ -257,107 +273,127 @@ class _BackupManagerSheetState extends State<_BackupManagerSheet> {
                               const SizedBox(height: 16),
                               _primaryBackupButton(
                                 enabled: !_saving,
-                                onPressed: _saving ? null : widget.onImport,
-                                icon: const Icon(Icons.restore_outlined),
-                                label: const Text('Import backup'),
+                                onPressed: _saving
+                                    ? null
+                                    : widget.onImport ?? widget.onExport,
+                                icon: Icon(widget.onImport != null
+                                    ? Icons.restore_outlined
+                                    : Icons.backup_outlined),
+                                label: Text(widget.onImport != null
+                                    ? 'Import backup'
+                                    : 'Export data'),
                               ),
-                              const SizedBox(height: 12),
-                              _primaryBackupButton(
-                                enabled: canSave,
-                                onPressed:
-                                    canSave ? widget.onSaveCurrent : null,
-                                label: const Text('Save to current backup'),
-                              ),
-                              if (_active == null || !_active!.canUpdate)
-                                const Padding(
-                                  padding: EdgeInsets.only(top: 8),
-                                  child: Text(
-                                    'Import a backup or create one before saving to the current file.',
-                                    style: TextStyle(
-                                      color: _backupMuted,
-                                      fontSize: 12,
-                                      height: 1.35,
+                              if (widget.onExport != null) ...[
+                                const SizedBox(height: 12),
+                                _primaryBackupButton(
+                                  enabled: canSave,
+                                  onPressed:
+                                      canSave ? widget.onSaveCurrent : null,
+                                  label: const Text('Save to current backup'),
+                                ),
+                                if (_active == null || !_active!.canUpdate)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 8),
+                                    child: Text(
+                                      'Import a backup or create one before saving to the current file.',
+                                      style: TextStyle(
+                                        color: _backupMuted,
+                                        fontSize: 12,
+                                        height: 1.35,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              const SizedBox(height: 12),
-                              OutlinedButton(
-                                onPressed: _saving ? null : widget.onCreateNew,
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: _backupViolet,
-                                  disabledForegroundColor: _backupMuted,
-                                  backgroundColor: _backupNight,
-                                  minimumSize: const Size.fromHeight(48),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 12),
-                                  side: const BorderSide(
-                                    color: _backupElectric,
-                                    width: _backupBorder,
+                                const SizedBox(height: 12),
+                                OutlinedButton(
+                                  onPressed:
+                                      _saving ? null : widget.onCreateNew,
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: _backupViolet,
+                                    disabledForegroundColor: _backupMuted,
+                                    backgroundColor: _backupNight,
+                                    minimumSize: const Size.fromHeight(48),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 12),
+                                    side: const BorderSide(
+                                      color: _backupElectric,
+                                      width: _backupBorder,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(_backupRadius),
+                                    ),
                                   ),
-                                  shape: RoundedRectangleBorder(
+                                  child: const Text('Create new backup'),
+                                ),
+                              ],
+                              const SizedBox(height: 16),
+                              if (widget.onImport != null)
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: _backupPanel,
                                     borderRadius:
                                         BorderRadius.circular(_backupRadius),
+                                    border: Border.all(
+                                      color: _backupCyan,
+                                      width: _backupBorder,
+                                    ),
                                   ),
-                                ),
-                                child: const Text('Create new backup'),
-                              ),
-                              const SizedBox(height: 16),
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: _backupPanel,
-                                  borderRadius:
-                                      BorderRadius.circular(_backupRadius),
-                                  border: Border.all(
-                                    color: _backupCyan,
-                                    width: _backupBorder,
-                                  ),
-                                ),
-                                child: Padding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                                  child: _loading
-                                      ? const Center(
-                                          child: Padding(
-                                            padding: EdgeInsets.all(12),
-                                            child: CircularProgressIndicator(),
-                                          ),
-                                        )
-                                      : Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.stretch,
-                                          children: [
-                                            Text(
-                                              _active == null
-                                                  ? 'Current backup: none'
-                                                  : 'Current backup: ${_active!.name}',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: _backupMuted,
-                                              ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 14, 16, 14),
+                                    child: _loading
+                                        ? const Center(
+                                            child: Padding(
+                                              padding: EdgeInsets.all(12),
+                                              child:
+                                                  CircularProgressIndicator(),
                                             ),
-                                            const SizedBox(height: 12),
-                                            _primaryBackupButton(
-                                              enabled: !_saving,
-                                              onPressed:
-                                                  _saving ? null : _rename,
-                                              label: Text(_saving
-                                                  ? 'Saving…'
-                                                  : 'Rename backup file'),
-                                            ),
-                                            if (_error != null) ...[
-                                              const SizedBox(height: 8),
+                                          )
+                                        : Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
                                               Text(
-                                                _error!,
+                                                _active == null
+                                                    ? 'Current backup: none'
+                                                    : 'Current backup: ${_active!.name}',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(
-                                                  color: Color(0xFFFFB4AB),
+                                                  color: _backupMuted,
                                                 ),
                                               ),
+                                              const SizedBox(height: 12),
+                                              _primaryBackupButton(
+                                                enabled: !_saving,
+                                                onPressed:
+                                                    _saving ? null : _rename,
+                                                label: Text(_saving
+                                                    ? 'Saving…'
+                                                    : 'Rename backup file'),
+                                              ),
+                                              if (_error != null) ...[
+                                                const SizedBox(height: 8),
+                                                Text(
+                                                  _error!,
+                                                  style: const TextStyle(
+                                                    color: Color(0xFFFFB4AB),
+                                                  ),
+                                                ),
+                                              ],
                                             ],
-                                          ],
-                                        ),
+                                          ),
+                                  ),
                                 ),
-                              ),
+                              if (widget.onExport != null && !_loading)
+                                Text(
+                                  _active == null
+                                      ? 'Current backup: none'
+                                      : 'Current backup: ${_active!.name}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: _backupMuted),
+                                ),
                             ],
                           ),
                         ),

@@ -14,6 +14,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   String? _version;
+  String? _buildNumber;
 
   @override
   void initState() {
@@ -131,11 +132,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final info = await PackageInfo.fromPlatform();
       if (!mounted) return;
-      setState(() => _version = info.version);
+      setState(() {
+        _version = info.version;
+        _buildNumber = info.buildNumber;
+      });
     } catch (error) {
       debugPrint('Could not read package info: $error');
       if (!mounted) return;
-      setState(() => _version = 'unavailable');
+      setState(() {
+        _version = 'unavailable';
+        _buildNumber = 'unavailable';
+      });
     }
   }
 
@@ -146,6 +153,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         : _version == 'unavailable'
             ? 'Version unavailable'
             : 'Version $_version';
+    // Android uses an integer versionCode: its final digit is the displayed
+    // minor build component (for example, 11 is displayed as 1.1).
+    final rawBuild = _buildNumber;
+    final build = rawBuild != null && RegExp(r'^\d{2,}$').hasMatch(rawBuild)
+        ? '${rawBuild.substring(0, rawBuild.length - 1)}.${rawBuild.substring(rawBuild.length - 1)}'
+        : rawBuild;
 
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     return SafeArea(
@@ -205,6 +218,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         color: Colors.white70,
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Build number: ${build ?? '…'}',
+                      textAlign: TextAlign.center,
+                      softWrap: true,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
                       ),
                     ),
                     const SizedBox(height: 8),

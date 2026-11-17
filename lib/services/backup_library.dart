@@ -40,6 +40,24 @@ class BackupLibrary {
   static const _pathKey = 'twince_active_backup_path';
   static const _uriKey = 'twince_active_backup_uri';
   static const _channel = MethodChannel('twince/import');
+  static const _folderChannel = MethodChannel('twince/backup_folder');
+
+  bool get _android =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  /// Requests a persistent Documents grant when one is not already available.
+  Future<void> ensureAndroidFolder() async {
+    if (!_android) return;
+    try {
+      if (await _folderChannel.invokeMethod<bool>('prepare') == true) return;
+      if (await _folderChannel.invokeMethod<bool>('authorize') == true) return;
+      throw const BackupNameException(
+          'Backup folder access was cancelled. Select Documents to save backups.');
+    } on PlatformException catch (error) {
+      throw BackupNameException(
+          error.message ?? 'Cannot access Documents/Twince.');
+    }
+  }
 
   Future<ActiveBackup?> current() async {
     final prefs = await SharedPreferences.getInstance();
@@ -82,7 +100,29 @@ class BackupLibrary {
     required String contents,
   }) async {
     final safe = normalizeBackupName(name);
+    if (_android) {
+      await ensureAndroidFolder();
+      try {
+        final uri = await _folderChannel.invokeMethod<String>('create', {
+          'name': safe,
+          'contents': contents,
+        });
+        if (uri == null || uri.isEmpty) {
+          throw const BackupNameException('Could not create the backup file.');
+        }
+        await _store(name: safe, path: null, sourceUri: uri);
+        return ActiveBackup(name: safe, sourceUri: uri);
+      } on PlatformException catch (error) {
+        throw BackupNameException(
+            error.message ?? 'Could not create the backup file.');
+      }
+    }
     final path = await writeBackupCopy(safe, contents);
+    if (path == null || path.isEmpty) {
+      throw const BackupNameException(
+        'Could not create the backup file. Check storage availability and try again.',
+      );
+    }
     await _store(name: safe, path: path, sourceUri: null);
     return ActiveBackup(name: safe, path: path);
   }
@@ -91,6 +131,29 @@ class BackupLibrary {
     final active = await current();
     if (active == null || !active.canUpdate) {
       return const BackupWriteResult(saved: false, updatedOriginal: false);
+    }
+    if (_android) {
+      await ensureAndroidFolder();
+      try {
+        final saved =
+            await _folderChannel.invokeMapMethod<String, String>('save', {
+          'name': active.name,
+          'path': active.path,
+          'uri': active.sourceUri,
+          'contents': contents,
+        });
+        final uri = saved?['uri'];
+        final name = saved?['name'];
+        if (uri == null || uri.isEmpty || name == null || name.isEmpty) {
+          throw const BackupNameException('Could not save the backup file.');
+        }
+        await _store(name: name, path: null, sourceUri: uri);
+        return BackupWriteResult(
+            saved: true, updatedOriginal: uri == active.sourceUri, name: name);
+      } on PlatformException catch (error) {
+        throw BackupNameException(
+            error.message ?? 'Could not save the backup file.');
+      }
     }
     if (active.sourceUri != null && active.sourceUri!.isNotEmpty) {
       final updated = await _writeSourceUri(active.sourceUri, contents);
